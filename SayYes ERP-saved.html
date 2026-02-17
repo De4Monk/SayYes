@@ -1,0 +1,475 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Elite Salon ERP - Material 3 High-Contrast</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&family=Outfit:wght@400;600;800&family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#2481cc',
+                        surface: '#121212',
+                        background: '#000000',
+                        error: '#ff5252',
+                        success: '#4caf50',
+                        'md-sys-dark-surface-container': '#1e1e1e',
+                        'md-sys-dark-outline': '#444746',
+                    },
+                    fontFamily: {
+                        sans: ['Roboto', 'sans-serif'],
+                        display: ['Outfit', 'sans-serif'],
+                    },
+                    animation: {
+                        'pulse-fast': 'pulse 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                        'slide-up': 'slideUp 0.3s ease-out',
+                        'fade-in': 'fadeIn 0.2s ease-in',
+                    },
+                    keyframes: {
+                        slideUp: {
+                            '0%': { transform: 'translateY(10px)', opacity: '0' },
+                            '100%': { transform: 'translateY(0)', opacity: '1' },
+                        },
+                        fadeIn: {
+                            '0%': { opacity: '0' },
+                            '100%': { opacity: '1' },
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        :root {
+            --tg-theme-bg-color: #000000;
+            --tg-theme-text-color: #ffffff;
+            --tg-theme-hint-color: #aaaaaa;
+            --tg-theme-link-color: #2481cc;
+            --tg-theme-button-color: #2481cc;
+            --tg-theme-button-text-color: #ffffff;
+        }
+
+        body {
+            background-color: var(--tg-theme-bg-color);
+            color: var(--tg-theme-text-color);
+            height: 100vh;
+            overflow: hidden;
+            -webkit-tap-highlight-color: transparent;
+            user-select: none;
+        }
+
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+
+        .nav-item.active .material-symbols-outlined {
+            font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+
+        .glass {
+            background: rgba(30, 30, 30, 0.8);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .view { display: none; }
+        .view.active { display: flex; flex-direction: column; animation: fadeIn 0.3s ease-out; }
+
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #333;
+            border-radius: 10px;
+        }
+
+        .skeleton-shimmer {
+            background: linear-gradient(90deg, #1a1a1a 25%, #2a2a2a 50%, #1a1a1a 75%);
+            background-size: 200% 100%;
+            animation: shimmer 1.5s infinite;
+        }
+
+        @keyframes shimmer {
+            0% { background-position: 200% 0; }
+            100% { background-position: -200% 0; }
+        }
+
+        .touch-target { min-height: 52px; min-width: 52px; }
+    </style>
+</head>
+<body class="flex flex-col font-sans">
+
+    <!-- Top Status Bar -->
+    <header id="app-header" class="fixed top-0 left-0 right-0 z-50 glass h-16 flex items-center justify-between px-6">
+        <div class="flex flex-col">
+            <span class="font-display font-extrabold text-xl tracking-tight text-white">ELITE<span class="text-primary">ERP</span></span>
+            <div class="flex items-center gap-2">
+                <span class="relative flex h-2 w-2">
+                    <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-success opacity-75"></span>
+                    <span class="relative inline-flex rounded-full h-2 w-2 bg-success"></span>
+                </span>
+                <span class="text-[10px] uppercase tracking-widest text-zinc-400 font-bold">Cloud Synced</span>
+            </div>
+        </div>
+        <div class="flex items-center gap-4">
+            <span id="header-time" class="text-sm font-medium tabular-nums text-zinc-300">12:00:00</span>
+            <div class="h-8 w-8 rounded-full bg-primary flex items-center justify-center font-bold text-xs">JD</div>
+        </div>
+    </header>
+
+    <!-- Main Content Area -->
+    <main class="flex-grow overflow-y-auto pt-20 pb-24 px-4 custom-scrollbar">
+        
+        <!-- Master View -->
+        <section id="masterView" class="view active">
+            <div class="mb-6">
+                <h1 class="font-display text-2xl font-bold mb-1">System Ecosystem</h1>
+                <p class="text-zinc-400 text-sm">Real-time infrastructure health</p>
+            </div>
+
+            <!-- Dashboard Grid -->
+            <div class="grid grid-cols-2 gap-3 mb-6">
+                <div class="bg-md-sys-dark-surface-container p-4 rounded-3xl border border-white/5">
+                    <span class="material-symbols-outlined text-primary mb-2">dns</span>
+                    <div class="text-2xl font-bold">99.9%</div>
+                    <div class="text-[10px] text-zinc-500 uppercase font-bold">Uptime</div>
+                </div>
+                <div class="bg-md-sys-dark-surface-container p-4 rounded-3xl border border-white/5">
+                    <span class="material-symbols-outlined text-success mb-2">speed</span>
+                    <div class="text-2xl font-bold">42ms</div>
+                    <div class="text-[10px] text-zinc-500 uppercase font-bold">Latency</div>
+                </div>
+            </div>
+
+            <!-- Recent Logs Card -->
+            <div class="bg-md-sys-dark-surface-container rounded-3xl p-5 border border-white/5 mb-6">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="font-bold text-lg">System Logs</h2>
+                    <button class="text-primary text-xs font-bold uppercase tracking-wider">Expand</button>
+                </div>
+                
+                <!-- Skeleton Loader -->
+                <div class="master-skeleton space-y-4">
+                    <div class="h-12 w-full skeleton-shimmer rounded-xl opacity-20"></div>
+                    <div class="h-12 w-full skeleton-shimmer rounded-xl opacity-20"></div>
+                    <div class="h-12 w-full skeleton-shimmer rounded-xl opacity-20"></div>
+                </div>
+
+                <!-- Actual Content -->
+                <div class="master-content hidden space-y-4">
+                    <div class="flex items-center gap-4 p-3 bg-black/30 rounded-2xl border border-white/5">
+                        <div class="bg-primary/20 p-2 rounded-lg"><span class="material-symbols-outlined text-primary scale-75">security</span></div>
+                        <div class="flex-grow">
+                            <div class="text-sm font-bold">Security Patch V2.4</div>
+                            <div class="text-[10px] text-zinc-500">Applied 12 mins ago</div>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-4 p-3 bg-black/30 rounded-2xl border border-white/5">
+                        <div class="bg-success/20 p-2 rounded-lg"><span class="material-symbols-outlined text-success scale-75">database</span></div>
+                        <div class="flex-grow">
+                            <div class="text-sm font-bold">Daily DB Backup</div>
+                            <div class="text-[10px] text-zinc-500">Completed at 04:00 AM</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <button onclick="mockAction('System Diagnostics')" class="w-full bg-primary py-4 rounded-2xl font-bold flex items-center justify-center gap-2 touch-target transition-transform active:scale-95 shadow-lg shadow-primary/20">
+                <span class="material-symbols-outlined">analytics</span>
+                Run Diagnostics
+            </button>
+        </section>
+
+        <!-- Admin View -->
+        <section id="adminView" class="view">
+            <div class="mb-6">
+                <h1 class="font-display text-2xl font-bold mb-1">Human Resources</h1>
+                <p class="text-zinc-400 text-sm">Staff & permission management</p>
+            </div>
+
+            <div class="relative mb-6">
+                <span class="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500">search</span>
+                <input type="text" placeholder="Search employees..." class="w-full bg-md-sys-dark-surface-container border border-white/10 rounded-2xl py-4 pl-12 pr-4 focus:border-primary outline-none text-sm transition-all">
+            </div>
+
+            <div class="bg-md-sys-dark-surface-container rounded-3xl overflow-hidden border border-white/5">
+                <div class="admin-skeleton p-4 space-y-4">
+                    <div class="flex items-center gap-4">
+                        <div class="h-12 w-12 rounded-full skeleton-shimmer opacity-20"></div>
+                        <div class="flex-grow space-y-2">
+                            <div class="h-4 w-1/2 skeleton-shimmer rounded opacity-20"></div>
+                            <div class="h-3 w-1/4 skeleton-shimmer rounded opacity-20"></div>
+                        </div>
+                    </div>
+                    <div class="h-[1px] bg-white/5"></div>
+                    <div class="flex items-center gap-4">
+                        <div class="h-12 w-12 rounded-full skeleton-shimmer opacity-20"></div>
+                        <div class="flex-grow space-y-2">
+                            <div class="h-4 w-1/2 skeleton-shimmer rounded opacity-20"></div>
+                            <div class="h-3 w-1/4 skeleton-shimmer rounded opacity-20"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="admin-content hidden divide-y divide-white/5">
+                    <div class="p-4 flex items-center justify-between hover:bg-white/5 transition-colors">
+                        <div class="flex items-center gap-4">
+                            <div class="h-12 w-12 rounded-full bg-zinc-800 flex items-center justify-center border-2 border-primary">SA</div>
+                            <div>
+                                <div class="font-bold">Sarah Adams</div>
+                                <div class="text-[10px] text-zinc-500 uppercase tracking-widest font-bold">Senior Stylist</div>
+                            </div>
+                        </div>
+                        <button class="p-2 rounded-xl bg-white/5 touch-target"><span class="material-symbols-outlined text-primary">more_vert</span></button>
+                    </div>
+                    <div class="p-4 flex items-center justify-between hover:bg-white/5 transition-colors">
+                        <div class="flex items-center gap-4">
+                            <div class="h-12 w-12 rounded-full bg-zinc-800 flex items-center justify-center border-2 border-zinc-700">MT</div>
+                            <div>
+                                <div class="font-bold">Mark Thompson</div>
+                                <div class="text-[10px] text-zinc-500 uppercase tracking-widest font-bold">Junior Artist</div>
+                            </div>
+                        </div>
+                        <button class="p-2 rounded-xl bg-white/5 touch-target"><span class="material-symbols-outlined text-primary">more_vert</span></button>
+                    </div>
+                </div>
+            </div>
+            
+            <button class="fixed bottom-24 right-6 h-14 w-14 bg-primary rounded-2xl shadow-2xl flex items-center justify-center transition-transform active:scale-90 z-40">
+                <span class="material-symbols-outlined scale-125">person_add</span>
+            </button>
+        </section>
+
+        <!-- Owner View -->
+        <section id="ownerView" class="view">
+            <div class="mb-6">
+                <h1 class="font-display text-2xl font-bold mb-1">Performance</h1>
+                <p class="text-zinc-400 text-sm">Revenue & growth metrics</p>
+            </div>
+
+            <div class="bg-white text-black p-6 rounded-[2.5rem] mb-6 shadow-2xl shadow-primary/10">
+                <div class="flex justify-between items-start mb-8">
+                    <div>
+                        <div class="text-xs font-bold text-zinc-400 uppercase tracking-widest mb-1">Net Revenue (Monthly)</div>
+                        <div class="text-4xl font-black font-display tracking-tight">$42,890.00</div>
+                    </div>
+                    <div class="bg-success/10 text-success text-[10px] px-2 py-1 rounded-full font-bold">+12.5%</div>
+                </div>
+                <div class="flex items-center gap-2">
+                    <div class="flex-grow h-1 bg-zinc-100 rounded-full overflow-hidden">
+                        <div class="h-full bg-primary w-3/4"></div>
+                    </div>
+                    <span class="text-[10px] font-bold text-zinc-400 uppercase">Target</span>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-4 mb-6">
+                <div class="bg-md-sys-dark-surface-container p-5 rounded-3xl border border-white/5">
+                    <div class="text-error font-black text-2xl mb-1">$1,240</div>
+                    <div class="text-[10px] text-zinc-500 uppercase font-bold">Overhead</div>
+                </div>
+                <div class="bg-md-sys-dark-surface-container p-5 rounded-3xl border border-white/5">
+                    <div class="text-primary font-black text-2xl mb-1">84%</div>
+                    <div class="text-[10px] text-zinc-500 uppercase font-bold">Retention</div>
+                </div>
+            </div>
+
+            <div class="bg-md-sys-dark-surface-container rounded-3xl p-5 border border-white/5">
+                <h3 class="font-bold mb-4">Client Insights</h3>
+                <div class="owner-skeleton space-y-3">
+                    <div class="h-16 w-full skeleton-shimmer rounded-2xl opacity-10"></div>
+                </div>
+                <div class="owner-content hidden space-y-4">
+                    <div class="flex items-center gap-4">
+                        <div class="h-10 w-10 bg-primary/10 rounded-xl flex items-center justify-center">
+                            <span class="material-symbols-outlined text-primary">groups</span>
+                        </div>
+                        <div class="flex-grow">
+                            <div class="text-sm font-bold">124 New Clients</div>
+                            <div class="text-[10px] text-zinc-500">Acquired this month</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Client View -->
+        <section id="clientView" class="view">
+            <div class="mb-6">
+                <h1 class="font-display text-2xl font-bold mb-1">My Bookings</h1>
+                <p class="text-zinc-400 text-sm">Manage your salon experience</p>
+            </div>
+
+            <div class="bg-md-sys-dark-surface-container rounded-[2rem] p-6 mb-6 border border-white/5 relative overflow-hidden">
+                <div class="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-full -mr-16 -mt-16 blur-3xl"></div>
+                
+                <div class="client-skeleton space-y-4">
+                    <div class="h-8 w-2/3 skeleton-shimmer rounded opacity-20"></div>
+                    <div class="h-20 w-full skeleton-shimmer rounded-2xl opacity-20"></div>
+                </div>
+
+                <div class="client-content hidden">
+                    <div class="flex items-center justify-between mb-6">
+                        <span class="bg-primary/20 text-primary text-[10px] font-bold px-3 py-1 rounded-full uppercase tracking-tighter">Confirmed</span>
+                        <span class="text-zinc-500 text-xs">Tomorrow, 10:30 AM</span>
+                    </div>
+                    <h2 class="text-xl font-bold mb-1">Executive Hair Design</h2>
+                    <p class="text-sm text-zinc-400 mb-6">with Master Stylist Sarah Adams</p>
+                    
+                    <div class="flex gap-2">
+                        <button onclick="mockAction('Rescheduling')" class="flex-grow bg-white/5 border border-white/10 py-3 rounded-xl text-xs font-bold uppercase transition-colors active:bg-white/10">Reschedule</button>
+                        <button onclick="mockAction('Checking details')" class="px-5 bg-white/5 border border-white/10 py-3 rounded-xl text-xs font-bold transition-colors active:bg-white/10"><span class="material-symbols-outlined text-sm">info</span></button>
+                    </div>
+                </div>
+            </div>
+
+            <button class="w-full bg-white text-black py-5 rounded-[2rem] font-black text-lg shadow-xl active:scale-95 transition-transform flex items-center justify-center gap-3">
+                <span class="material-symbols-outlined">calendar_month</span>
+                Book New Session
+            </button>
+        </section>
+
+    </main>
+
+    <!-- Navigation -->
+    <nav id="app-navigation" class="fixed bottom-0 left-0 right-0 glass h-20 px-4 flex items-center justify-around z-50">
+        <button data-role="master" class="nav-item active flex flex-col items-center gap-1 group relative touch-target">
+            <div class="absolute -top-1 w-12 h-8 bg-primary/20 rounded-full scale-0 group-[.active]:scale-100 transition-transform duration-300"></div>
+            <span class="material-symbols-outlined text-zinc-400 group-[.active]:text-primary transition-colors">hub</span>
+            <span class="text-[10px] font-bold uppercase tracking-widest text-zinc-500 group-[.active]:text-white">Master</span>
+        </button>
+        <button data-role="admin" class="nav-item flex flex-col items-center gap-1 group relative touch-target">
+            <div class="absolute -top-1 w-12 h-8 bg-primary/20 rounded-full scale-0 group-[.active]:scale-100 transition-transform duration-300"></div>
+            <span class="material-symbols-outlined text-zinc-400 group-[.active]:text-primary transition-colors">badge</span>
+            <span class="text-[10px] font-bold uppercase tracking-widest text-zinc-500 group-[.active]:text-white">Admin</span>
+        </button>
+        <button data-role="owner" class="nav-item flex flex-col items-center gap-1 group relative touch-target">
+            <div class="absolute -top-1 w-12 h-8 bg-primary/20 rounded-full scale-0 group-[.active]:scale-100 transition-transform duration-300"></div>
+            <span class="material-symbols-outlined text-zinc-400 group-[.active]:text-primary transition-colors">query_stats</span>
+            <span class="text-[10px] font-bold uppercase tracking-widest text-zinc-500 group-[.active]:text-white">Owner</span>
+        </button>
+        <button data-role="client" class="nav-item flex flex-col items-center gap-1 group relative touch-target">
+            <div class="absolute -top-1 w-12 h-8 bg-primary/20 rounded-full scale-0 group-[.active]:scale-100 transition-transform duration-300"></div>
+            <span class="material-symbols-outlined text-zinc-400 group-[.active]:text-primary transition-colors">person</span>
+            <span class="text-[10px] font-bold uppercase tracking-widest text-zinc-500 group-[.active]:text-white">Client</span>
+        </button>
+    </nav>
+
+    <!-- Toast Container -->
+    <div id="toast-container" class="fixed bottom-24 left-4 right-4 z-[100] pointer-events-none flex flex-col gap-2"></div>
+
+    <script>
+        const views = {
+            master: { id: 'masterView', loaded: false },
+            admin: { id: 'adminView', loaded: false },
+            owner: { id: 'ownerView', loaded: false },
+            client: { id: 'clientView', loaded: false }
+        };
+
+        function updateHeaderTime() {
+            const now = new Date();
+            document.getElementById('header-time').textContent = now.toLocaleTimeString('en-US', { hour12: false });
+        }
+
+        function showToast(message, type = 'info') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            
+            const iconMap = {
+                success: 'check_circle',
+                error: 'error',
+                info: 'info'
+            };
+
+            const colorMap = {
+                success: 'bg-success',
+                error: 'bg-error',
+                info: 'bg-primary'
+            };
+
+            toast.className = `flex items-center gap-3 p-4 rounded-2xl shadow-2xl animate-slide-up glass border-l-4 ${type === 'success' ? 'border-success' : type === 'error' ? 'border-error' : 'border-primary'}`;
+            toast.innerHTML = `
+                <span class="material-symbols-outlined ${type === 'success' ? 'text-success' : type === 'error' ? 'text-error' : 'text-primary'}">${iconMap[type]}</span>
+                <span class="text-sm font-bold text-white">${message}</span>
+            `;
+
+            container.appendChild(toast);
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                toast.style.transform = 'translateY(-20px)';
+                toast.style.transition = 'all 0.3s ease-in';
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+
+        async function mockAction(actionName) {
+            showToast(`${actionName} in progress...`, 'info');
+            await new Promise(r => setTimeout(r, 1500));
+            const success = Math.random() > 0.15;
+            if (success) {
+                showToast(`${actionName} completed successfully`, 'success');
+            } else {
+                showToast(`${actionName} failed. Try again.`, 'error');
+            }
+        }
+
+        function loadRoleContent(role) {
+            if (views[role].loaded) return;
+
+            const skeleton = document.querySelector(`.${role}-skeleton`);
+            const content = document.querySelector(`.${role}-content`);
+
+            setTimeout(() => {
+                if (skeleton) skeleton.classList.add('hidden');
+                if (content) content.classList.remove('hidden');
+                views[role].loaded = true;
+                showToast(`${role.charAt(0).toUpperCase() + role.slice(1)} dashboard ready`, 'success');
+            }, 1200);
+        }
+
+        function switchRole(role) {
+            // Update Navigation
+            document.querySelectorAll('.nav-item').forEach(nav => {
+                nav.classList.remove('active');
+                if (nav.dataset.role === role) nav.classList.add('active');
+            });
+
+            // Update View
+            document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+            document.getElementById(views[role].id).classList.add('active');
+
+            loadRoleContent(role);
+        }
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            setInterval(updateHeaderTime, 1000);
+            updateHeaderTime();
+
+            // Setup Navigation
+            document.querySelectorAll('.nav-item').forEach(nav => {
+                nav.addEventListener('click', () => switchRole(nav.dataset.role));
+            });
+
+            // Initial Load
+            loadRoleContent('master');
+
+            // Telegram WebApp Integration Mock
+            if (window.Telegram && window.Telegram.WebApp) {
+                window.Telegram.WebApp.ready();
+                window.Telegram.WebApp.expand();
+                window.Telegram.WebApp.headerColor = '#121212';
+                window.Telegram.WebApp.backgroundColor = '#000000';
+            }
+        });
+    </script>
+</body>
+</html>
