@@ -1,0 +1,81 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Telegram Theme Variables (Fallbacks) */
+    --tg-theme-bg-color: #f4f4f5;
+    --tg-theme-text-color: #000000;
+    --tg-theme-hint-color: #aaaaaa;
+    --tg-theme-link-color: #2481cc;
+    --tg-theme-button-color: #2481cc;
+    --tg-theme-button-text-color: #ffffff;
+
+    /* Material 3 / Custom Variables */
+    --color-primary: #2481cc;
+    --color-background: #f4f4f5;
+    --color-surface: #ffffff;
+    --color-error: #ff5252; /* High-contrast Red */
+    --color-success: #4caf50;
+    --color-text: #000000;
+
+    --font-sans: 'Roboto', sans-serif;
+    --font-display: 'Outfit', sans-serif;
+  }
+
+  body {
+    @apply bg-[var(--color-background)] text-[var(--color-text)] font-sans overflow-hidden select-none h-screen;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* Custom Scrollbar */
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 4px;
+  }
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    @apply bg-zinc-300 rounded-full;
+  }
+}
+
+@layer components {
+  /* Minimum Touch Target for Accessibility */
+  .touch-target {
+    @apply min-h-[52px] min-w-[52px];
+  }
+
+  /* Glassmorphism utility if needed (though user asked for solid white mostly, glass used in nav) */
+  .glass {
+    @apply bg-white/80 backdrop-blur-md border-t border-zinc-200;
+  }
+  
+  /* Skeleton Loading Animation */
+  .skeleton-shimmer {
+      background: linear-gradient(90deg, #e0e0e0 25%, #f0f0f0 50%, #e0e0e0 75%);
+      background-size: 200% 100%;
+      animation: shimmer 1.5s infinite;
+  }
+}
+
+@keyframes shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+@keyframes slideUp {
+  0% { transform: translateY(10px); opacity: 0; }
+  100% { transform: translateY(0); opacity: 1; }
+}
+
+@keyframes fadeIn {
+  0% { opacity: 0; }
+  100% { opacity: 1; }
+}
+
+.animate-slide-up {
+  animation: slideUp 0.3s ease-out forwards;
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.2s ease-in forwards;
+}
