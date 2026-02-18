@@ -1,5 +1,7 @@
 import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
+import { useRole } from '../../contexts/RoleContext';
 import { AppointmentListItem } from '../molecules/AppointmentListItem';
 import { InventoryWidget } from '../molecules/InventoryWidget';
 import { NavLink } from 'react-router-dom';
@@ -11,9 +13,13 @@ export const SalonOperationsDashboard = () => {
     const [stats, setStats] = useState({ revenue: 0, count: 0 });
     const [loading, setLoading] = useState(true);
 
+    const { currentRole, currentUser } = useRole();
+
+    const DYE_KEYWORDS = ["color", "coloring", "correction", "complex", "окрашивание", "коррекция", "комплекс", "toning", "тонер", "мелирование", "airtouch", "shatush", "balayage"];
+
     useEffect(() => {
         fetchData();
-    }, []);
+    }, [currentUser]); // Re-fetch when user loads
 
     const fetchData = async () => {
         setLoading(true);
@@ -24,12 +30,32 @@ export const SalonOperationsDashboard = () => {
             console.log("Fetching appointments for local date:", todayStr);
 
             // Get appointments for today
-            const { data, error } = await supabase
+            // Get appointments for today
+            let query = supabase
                 .from('appointments')
                 .select('*')
                 .gte('appointment_time', `${todayStr}T00:00:00`)
                 .lte('appointment_time', `${todayStr}T23:59:59`)
                 .order('appointment_time', { ascending: true });
+
+            // RBAC Filter: 
+            // - Owner/Admin: See ALL appointments (no filter)
+            // - Master/Barber: See ONLY their own appointments (filter by dikidi_master_id)
+            if (currentRole === 'master' || currentRole === 'barber') {
+                if (currentUser && currentUser.dikidi_master_id) {
+                    // console.log("Applying Master Filter:", currentUser.dikidi_master_id);
+                    query = query.eq('master_id', currentUser.dikidi_master_id);
+                } else {
+                    console.warn("Role is master but no dikidi_master_id found in profile. Showing empty or all?");
+                    // Ideally show nothing if ID is missing to be safe, but for now we let it fall through or we could force a filter that returns nothing
+                    // query = query.eq('master_id', '000000'); // Force empty
+                }
+            } else if (currentRole === 'owner' || currentRole === 'admin') {
+                // No filter needed, they see everything
+                // console.log("Owner/Admin Access - Showing All Records");
+            }
+
+            const { data, error } = await query;
 
             if (error) throw error;
 
@@ -57,7 +83,12 @@ export const SalonOperationsDashboard = () => {
                 <div className="flex items-center justify-between mb-4">
                     <div>
                         <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">{new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}</p>
-                        <h1 className="text-xl font-bold text-slate-900 dark:text-white mt-0.5">Luxe Salon & Spa</h1>
+                        <h1 className="text-xl font-bold text-slate-900 dark:text-white mt-0.5">
+                            {(currentRole === 'owner' || currentRole === 'admin')
+                                ? 'SayYes Salon'
+                                : `Hello, ${currentUser?.full_name || currentUser?.first_name || 'Master'}`
+                            }
+                        </h1>
                     </div>
                     <button className="relative h-10 w-10 rounded-full overflow-hidden border-2 border-white dark:border-slate-700 shadow-sm focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2">
                         <img
@@ -126,17 +157,25 @@ export const SalonOperationsDashboard = () => {
                         {!loading && appointments.length === 0 && (
                             <div className="p-4 text-center text-slate-400 bg-slate-50 rounded-xl">No appointments today</div>
                         )}
-                        {appointments.slice(0, 3).map((app) => (
-                            <NavLink to="/schedule" key={app.id} className="block">
-                                <AppointmentListItem
-                                    time={app.appointment_time}
-                                    clientName={app.client_name}
-                                    serviceName={app.service_name}
-                                    status={app.status}
-                                    onClick={() => { }}
-                                />
-                            </NavLink>
-                        ))}
+                        {appointments.slice(0, 5).map((app) => {
+                            // Check for Color Service
+                            const isColorService = DYE_KEYWORDS.some(keyword =>
+                                (app.service_name || '').toLowerCase().includes(keyword)
+                            );
+
+                            return (
+                                <NavLink to="/schedule" key={app.id} className="block">
+                                    <AppointmentListItem
+                                        time={app.appointment_time}
+                                        clientName={app.client_name}
+                                        serviceName={app.service_name}
+                                        status={app.status}
+                                        onClick={() => { }}
+                                        onAddDye={isColorService ? () => console.log("Add Dye for", app.id) : undefined}
+                                    />
+                                </NavLink>
+                            );
+                        })}
                     </div>
                 </div>
             </div>
