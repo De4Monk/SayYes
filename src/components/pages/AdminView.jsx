@@ -2,6 +2,7 @@ import React from 'react';
 import { Heading, Text } from '../atoms/Typography';
 import { BarPOSGrid } from '../organisms/BarPOSGrid';
 import { VerificationQueue } from '../organisms/VerificationQueue';
+import { InventoryTable } from '../organisms/InventoryTable';
 
 export const AdminView = () => {
     return (
@@ -12,6 +13,8 @@ export const AdminView = () => {
             </div>
 
             <VerificationQueue />
+
+            <InventoryTable />
 
             <div className="h-1 bg-zinc-100 rounded-full" />
 

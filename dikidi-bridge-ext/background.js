@@ -11,26 +11,36 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
         console.log("!!! BRIDGE STEP 3: Attempting Supabase POST for ID:", appointment.external_id);
 
-        fetch(`${SUPABASE_URL}/rest/v1/appointments`, {
+        // RPC Call to 'upsert_appointment_via_dikidi'
+        const rpcPayload = {
+            p_external_id: String(appointment.external_id),
+            p_client_name: appointment.client_name,
+            p_service_name: appointment.service_name,
+            p_service_price: appointment.service_price,
+            p_status: appointment.status,
+            p_appointment_time: appointment.appointment_time,
+            p_dikidi_master_id: appointment.master_id ? String(appointment.master_id) : null,
+            p_debug_date: appointment.debug_date || null
+        };
+
+        fetch(`${SUPABASE_URL}/rest/v1/rpc/upsert_appointment_via_dikidi`, {
             method: 'POST',
             mode: 'cors',
             headers: {
                 'apikey': SUPABASE_KEY,
                 'Authorization': `Bearer ${SUPABASE_KEY}`,
                 'Content-Type': 'application/json',
-                'Prefer': 'resolution=merge-duplicates'
+                'Prefer': 'return=minimal' // We don't need the full object back
             },
-            body: JSON.stringify(appointment)
+            body: JSON.stringify(rpcPayload)
         })
             .then(async response => {
-                console.log("Supabase HTTP Status:", response.status);
-                const text = await response.text();
-                console.log("Supabase Response Body:", text);
-
+                console.log("Supabase RPC Status:", response.status);
                 if (!response.ok) {
-                    console.error("Supabase Error:", text);
+                    const text = await response.text();
+                    console.error("Supabase RPC Error:", text);
                 } else {
-                    console.log("Dikidi Bridge: Sync Success for", appointment.external_id);
+                    console.log("Dikidi Bridge: RPC Sync Success for", appointment.external_id);
                 }
             })
             .catch(error => {

@@ -2,7 +2,20 @@ import React from 'react';
 import { useRole } from '../../contexts/RoleContext';
 
 export const AuthGuard = ({ children }) => {
-    const { currentUser, isLoading } = useRole();
+    const { currentUser, isLoading, error } = useRole();
+
+    // 0. Global Error State
+    if (error) {
+        return (
+            <div className="p-6 flex flex-col items-center justify-center h-screen bg-red-50 text-red-800">
+                <h2 className="text-xl font-bold mb-2">System Error</h2>
+                <p className="mb-4 text-center">{error.message || "Failed to initialize application"}</p>
+                <button onClick={() => window.location.reload()} className="px-4 py-2 bg-red-600 text-white rounded-lg">
+                    Retry
+                </button>
+            </div>
+        );
+    }
 
     // 1. Loading State
     if (isLoading) {

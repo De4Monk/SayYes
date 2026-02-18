@@ -7,6 +7,7 @@ export const RoleProvider = ({ children }) => {
     const [currentRole, setCurrentRole] = useState('master'); // Default to master until loaded
     const [currentUser, setCurrentUser] = useState(null);
     const [isLoading, setIsLoading] = useState(true);
+    const [error, setError] = useState(null);
 
     useEffect(() => {
         const initAuth = async () => {
@@ -43,6 +44,19 @@ export const RoleProvider = ({ children }) => {
                 }
             } catch (err) {
                 console.error("Auth Init Error:", err);
+                // Fallback for Dev/Browser Mode if Auth fails
+                if (import.meta.env.DEV || !window.Telegram?.WebApp) {
+                    console.warn("⚠️ Auth Failed or No Telegram. Activating DEV MODE.");
+                    setCurrentUser({
+                        id: 'dev-admin-id',
+                        telegram_id: 'dev_admin',
+                        role: 'admin', // Default to Admin for easier testing
+                        native_name: 'Dev Admin'
+                    });
+                    setCurrentRole('admin');
+                } else {
+                    setError(err);
+                }
             } finally {
                 setIsLoading(false);
             }
@@ -57,7 +71,7 @@ export const RoleProvider = ({ children }) => {
     };
 
     return (
-        <RoleContext.Provider value={{ currentRole, currentUser, switchRole, isLoading }}>
+        <RoleContext.Provider value={{ currentRole, currentUser, switchRole, isLoading, error }}>
             {children}
         </RoleContext.Provider>
     );
