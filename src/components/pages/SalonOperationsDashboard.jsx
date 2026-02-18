@@ -18,14 +18,17 @@ export const SalonOperationsDashboard = () => {
     const fetchData = async () => {
         setLoading(true);
         try {
-            const today = new Date();
-            today.setHours(0, 0, 0, 0);
+            // Fix: Use local date string to avoid UTC conversion issues
+            // 'en-CA' format is YYYY-MM-DD which matches ISO date part
+            const todayStr = new Date().toLocaleDateString('en-CA');
+            console.log("Fetching appointments for local date:", todayStr);
 
             // Get appointments for today
             const { data, error } = await supabase
                 .from('appointments')
                 .select('*')
-                .gte('appointment_time', today.toISOString())
+                .gte('appointment_time', `${todayStr}T00:00:00`)
+                .lte('appointment_time', `${todayStr}T23:59:59`)
                 .order('appointment_time', { ascending: true });
 
             if (error) throw error;

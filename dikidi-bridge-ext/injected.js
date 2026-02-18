@@ -20,6 +20,62 @@
 
         let foundCount = 0;
 
+        const processRecordData = (recordId, info) => {
+            // 1. External ID & Filtering
+            const externalId = String(recordId);
+
+            // Filter out non-numeric IDs or metadata keys like 'info'
+            if (!externalId || externalId === 'info' || isNaN(Number(externalId))) {
+                return;
+            }
+
+            // 2. Client Name & Cleaning
+            let clientName = 'Unknown Client';
+            if (info.client && info.client.name) clientName = info.client.name;
+            else if (info.client_name) clientName = info.client_name;
+
+            clientName = clientName ? clientName.trim() : 'Unknown Client';
+
+            // 3. Service Name & Cleaning
+            let serviceName = 'Unknown Service';
+            if (info.services_title && Array.isArray(info.services_title) && info.services_title.length > 0) {
+                serviceName = info.services_title[0];
+            } else if (info.service_name) {
+                serviceName = info.service_name;
+            } else if (info.services && Array.isArray(info.services) && info.services.length > 0) {
+                serviceName = info.services[0].name || info.services[0].title || 'Service';
+            }
+
+            serviceName = serviceName ? serviceName.trim() : 'Unknown Service';
+
+            // 4. Price & Cost
+            const price = parseFloat(info.cost || info.total_cost || info.price || 0);
+
+            // 5. Status
+            let status = 'in_progress';
+            const paidAmount = parseFloat(info.paid || info.pay_sum || 0);
+
+            if (info.paid_full == 1 || (paidAmount >= price && price > 0)) {
+                status = 'paid';
+            }
+
+            const appointment = {
+                external_id: externalId,
+                client_name: clientName,
+                service_name: serviceName,
+                service_price: price,
+                status: status,
+                appointment_time: new Date().toISOString()
+            };
+
+            // Send to Content Script
+            const payload = appointment;
+
+            console.log("!!! DATA SENT TO TUNNEL (CustomEvent):", payload.external_id);
+            const event = new CustomEvent('DIKIDI_SYNC_EVENT', { detail: payload });
+            document.dispatchEvent(event);
+        };
+
         // Recursive function to find appointment-like objects
         const findAndExtract = (obj, depth = 0) => {
             if (depth > 20) return; // Safety break
@@ -124,61 +180,7 @@
         }
     };
 
-    const processRecordData = (recordId, info) => {
-        // 1. External ID & Filtering
-        const externalId = String(recordId);
 
-        // Filter out non-numeric IDs or metadata keys like 'info'
-        if (!externalId || externalId === 'info' || isNaN(Number(externalId))) {
-            return;
-        }
-
-        // 2. Client Name & Cleaning
-        let clientName = 'Unknown Client';
-        if (info.client && info.client.name) clientName = info.client.name;
-        else if (info.client_name) clientName = info.client_name;
-
-        clientName = clientName ? clientName.trim() : 'Unknown Client';
-
-        // 3. Service Name & Cleaning
-        let serviceName = 'Unknown Service';
-        if (info.services_title && Array.isArray(info.services_title) && info.services_title.length > 0) {
-            serviceName = info.services_title[0];
-        } else if (info.service_name) {
-            serviceName = info.service_name;
-        } else if (info.services && Array.isArray(info.services) && info.services.length > 0) {
-            serviceName = info.services[0].name || info.services[0].title || 'Service';
-        }
-
-        serviceName = serviceName ? serviceName.trim() : 'Unknown Service';
-
-        // 4. Price & Cost
-        const price = parseFloat(info.cost || info.total_cost || info.price || 0);
-
-        // 5. Status
-        let status = 'in_progress';
-        const paidAmount = parseFloat(info.paid || info.pay_sum || 0);
-
-        if (info.paid_full == 1 || (paidAmount >= price && price > 0)) {
-            status = 'paid';
-        }
-
-        const appointment = {
-            external_id: externalId,
-            client_name: clientName,
-            service_name: serviceName,
-            service_price: price,
-            status: status,
-            appointment_time: new Date().toISOString()
-        };
-
-        // Send to Content Script
-        const payload = appointment;
-
-        console.log("!!! DATA SENT TO TUNNEL (CustomEvent):", payload.external_id);
-        const event = new CustomEvent('DIKIDI_SYNC_EVENT', { detail: payload });
-        document.dispatchEvent(event);
-    };
 
     // 1. Monkey-patch XMLHttpRequest
     const XHR = XMLHttpRequest.prototype;
