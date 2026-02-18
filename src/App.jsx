@@ -1,5 +1,5 @@
 import React from 'react';
-import { Routes, Route } from 'react-router-dom';
+import { Routes, Route, Navigate } from 'react-router-dom';
 import { DashboardLayout } from './components/templates/DashboardLayout';
 import { SalonOperationsDashboard } from './components/pages/SalonOperationsDashboard';
 import { RoleProvider, useRole } from './contexts/RoleContext';
