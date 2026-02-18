@@ -34,7 +34,12 @@
             if (info.client && info.client.name) clientName = info.client.name;
             else if (info.client_name) clientName = info.client_name;
 
-            clientName = clientName ? clientName.trim() : 'Unknown Client';
+            clientName = clientName ? clientName.trim() : '';
+
+            // STRICT FILTER: Unknown Client
+            if (!clientName || clientName === 'Unknown Client') {
+                return;
+            }
 
             // 3. Service Name & Cleaning
             let serviceName = 'Unknown Service';
@@ -46,7 +51,12 @@
                 serviceName = info.services[0].name || info.services[0].title || 'Service';
             }
 
-            serviceName = serviceName ? serviceName.trim() : 'Unknown Service';
+            serviceName = serviceName ? serviceName.trim() : '';
+
+            // STRICT FILTER: Empty Service
+            if (!serviceName || serviceName === 'Unknown Service') {
+                return;
+            }
 
             // 4. Price & Cost
             const price = parseFloat(info.cost || info.total_cost || info.price || 0);
@@ -59,13 +69,23 @@
                 status = 'paid';
             }
 
+            // 6. DATE VALIDATION (Double Check)
+            if (info.time_start) {
+                const apptDatePart = info.time_start.split(' ')[0]; // "2023-10-27"
+                const todayStr = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Tbilisi' });
+
+                if (apptDatePart !== todayStr) {
+                    return;
+                }
+            }
+
             const appointment = {
                 external_id: externalId,
                 client_name: clientName,
                 service_name: serviceName,
                 service_price: price,
                 status: status,
-                appointment_time: new Date().toISOString()
+                appointment_time: info.time_start ? new Date(info.time_start).toISOString() : new Date().toISOString()
             };
 
             // Send to Content Script
@@ -77,32 +97,19 @@
         };
 
         // Recursive function to find appointment-like objects
+        /* 
+        DISABLED RECURSION TO PREVENT DATA FLOOD
         const findAndExtract = (obj, depth = 0) => {
             if (depth > 20) return; // Safety break
             if (!obj || typeof obj !== 'object') return;
-
-            // Check array or object entries
             Object.entries(obj).forEach(([key, val]) => {
                 if (!val || typeof val !== 'object') return;
-
-                // Check if 'val' looks like an appointment record
-                // Heuristic: has 'client' (obj) or 'client_name' AND 'services' (array) or 'services_title'
-
-                // Sometimes the object itself is the record, sometimes it's inside 'info'
                 const candidate = val.info ? val.info : val;
-
-                // Check for existence of client and service info
                 const hasClient = (candidate.client || candidate.client_name || candidate.client_id);
                 const hasServices = (candidate.services || candidate.services_title || candidate.service_name);
 
                 if (hasClient && hasServices) {
-                    // Found a potential match!
-                    // If we found it via key iteration, 'key' might be the ID
-                    // If 'val' has 'id', use that.
-
                     const recordId = (val.info && key) ? key : (val.id || candidate.id || key);
-
-                    // Process this record
                     try {
                         processRecordData(recordId, candidate);
                         foundCount++;
@@ -110,45 +117,44 @@
                         console.error("Error processing text candidate", e);
                     }
                 }
-
-                // Continue recursion
                 findAndExtract(val, depth + 1);
             });
         };
+        */
 
         // STRATEGY 1: Specific handling for Journal API structure
-        // User reports path: data.masters.records.data
-        // Logs suggested: data.masters.services.data (maybe?)
-        // We will try to find the 'data' holder safely
         if (data.masters) {
-            let masterData = null;
+            // Calculate Today in Tbilisi
+            const todayStr = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Tbilisi' });
+            console.log("Dikidi Bridge: Filtering specifically for Today:", todayStr);
+
+            let todayAppointments = null;
+
+            // 1. Check data.masters.records.data -> [Date]
             if (data.masters.records && data.masters.records.data) {
-                console.log("Dikidi Bridge: 'masters.records.data' path found.");
-                masterData = data.masters.records.data;
-            } else if (data.masters.data) {
-                console.log("Dikidi Bridge: 'masters.data' path found.");
-                masterData = data.masters.data;
-            } else if (data.masters.services && data.masters.services.data) {
-                console.log("Dikidi Bridge: 'masters.services.data' path found.");
-                masterData = data.masters.services.data;
+                if (data.masters.records.data[todayStr]) {
+                    console.log("Dikidi Bridge: Found records for today in 'masters.records.data'");
+                    todayAppointments = data.masters.records.data[todayStr];
+                }
+            }
+            // 2. Fallback: Check data.masters.data
+            else if (data.masters.data) {
+                console.log("Dikidi Bridge: 'masters.data' path found. Processing all, relying on processRecordData validation.");
+                todayAppointments = data.masters.data;
             }
 
-            if (masterData) {
+            if (todayAppointments) {
                 try {
-                    Object.values(masterData).forEach(masterAppointments => {
-                        if (!masterAppointments || typeof masterAppointments !== 'object') return;
+                    Object.values(todayAppointments).forEach(masterGroup => {
+                        if (!masterGroup || typeof masterGroup !== 'object') return;
 
-                        Object.entries(masterAppointments).forEach(([apptId, apptData]) => {
-                            // Sometimes the raw object is the data, sometimes it's wrapped
+                        Object.entries(masterGroup).forEach(([apptId, apptData]) => {
                             const candidate = apptData.info ? apptData.info : apptData;
 
-                            // Debug first candidate keys if we haven't found anything yet
                             if (foundCount === 0) {
                                 console.log("Debug: First Appointment Candidate Keys:", Object.keys(candidate));
                             }
 
-                            // Relaxed heuristic for this specific path - we trust the structure more
-                            // If it has an ID, we try to process it
                             const hasId = candidate.id || apptId;
 
                             if (hasId) {
@@ -163,24 +169,22 @@
             }
         }
 
+        /*
         // STRATEGY 2: Generic Recursive Search (Fallback)
         if (foundCount === 0) {
             findAndExtract(data);
         }
+        */
 
         // Fallback Logging if nothing found
         if (foundCount === 0) {
             console.log("!!! STEP 1 FAIL: URL matched but extraction logic returned null for", url);
-            console.log("JSON Root Keys:", Object.keys(data));
-
             // SPECIFIC DEBUG FOR JOURNAL
-            if (data.masters) {
-                console.log("!!! DEBUG JOURNAL: 'masters' key found. Keys:", Object.keys(data.masters));
+            if (data.masters && data.masters.records && data.masters.records.data) {
+                console.log("Available Dates in Response:", Object.keys(data.masters.records.data));
             }
         }
     };
-
-
 
     // 1. Monkey-patch XMLHttpRequest
     const XHR = XMLHttpRequest.prototype;
