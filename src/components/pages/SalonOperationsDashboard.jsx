@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import React, { useEffect, useState } from 'react';
+
 import { supabase } from '../../lib/supabase';
 import { useRole } from '../../contexts/RoleContext';
 import { AppointmentListItem } from '../molecules/AppointmentListItem';
