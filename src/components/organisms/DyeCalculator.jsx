@@ -5,7 +5,7 @@ import { Keypad } from '../molecules/Keypad';
 import { cn } from '../../lib/utils';
 import { supabase } from '../../lib/supabase';
 
-export const DyeCalculator = () => {
+export const DyeCalculator = ({ appointment }) => {
     const [value, setValue] = useState('0');
     const [loading, setLoading] = useState(false);
 
@@ -30,27 +30,22 @@ export const DyeCalculator = () => {
         setLoading(true);
         try {
             const { data: { user } } = await supabase.auth.getUser();
-            if (!user) {
-                console.error("No authenticated user");
-                // For demo/dev purposes without auth, we might just log or return
-                // return; 
-            }
+            // Allow logging even if user is null for now (or handle anonymously if needed)
 
-            // TODO: In a real app, we would select the specific Inventory Unit ID here.
-            // For now, we log a generic usage or "open" usage.
             const grams = parseFloat(value);
 
             const { error } = await supabase.from('usage_logs').insert({
                 grams_used: grams,
-                master_id: user?.id, // This will fail if RLS/Reference checks fail and no user is logged in
-                // appointment_id, unit_id - optional/context dependent
+                master_id: user?.id || null,
+                appointment_id: appointment?.id || null, // Link to real appointment!
                 notes: 'Manual dispense from DyeCalculator'
             });
 
             if (error) throw error;
 
-            console.log("Dispensed:", grams, "g");
+            console.log("Dispensed:", grams, "g for appointment", appointment?.id);
             setValue('0');
+            // Optimistic UI update or toast here
         } catch (error) {
             console.error("Error dispensing:", error);
             alert("Error logging usage: " + error.message);

@@ -1,14 +1,17 @@
 {
     "manifest_version": 3,
     "name": "Dikidi Bridge for SayYes ERP",
-    "version": "1.0",
+    "version": "1.2",
     "description": "Syncs appointment status from Dikidi to Supabase.",
     "permissions": [
         "activeTab",
         "scripting"
     ],
     "host_permissions": [
-        "https://dkd.su/*",
+        "https://*.dikidi.net/*",
+        "https://*.dikidi.ru/*",
+        "https://*.dikidi.com/*",
+        "https://*.dkd.su/*",
         "https://ozrpmpwnfrimjjrjsfms.supabase.co/*"
     ],
     "background": {
@@ -17,10 +20,26 @@
     "content_scripts": [
         {
             "matches": [
-                "https://dkd.su/*"
+                "https://*.dikidi.net/*",
+                "https://*.dikidi.ru/*",
+                "https://*.dikidi.com/*",
+                "https://*.dkd.su/*"
             ],
             "js": [
                 "content_script.js"
+            ],
+            "all_frames": true,
+            "run_at": "document_start",
+            "match_about_blank": true
+        }
+    ],
+    "web_accessible_resources": [
+        {
+            "resources": [
+                "injected.js"
+            ],
+            "matches": [
+                "<all_urls>"
             ]
         }
     ]
