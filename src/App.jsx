@@ -3,6 +3,7 @@ import { Routes, Route } from 'react-router-dom';
 import { DashboardLayout } from './components/templates/DashboardLayout';
 import { SalonOperationsDashboard } from './components/pages/SalonOperationsDashboard';
 import { RoleProvider, useRole } from './contexts/RoleContext';
+import { AuthGuard } from './components/auth/AuthGuard';
 import { MainLayout } from './components/templates/MainLayout';
 import { MasterView } from './components/pages/MasterView';
 import { Heading } from './components/atoms/Typography';
@@ -31,14 +32,16 @@ const RoleBasedContent = () => {
 function App() {
   return (
     <RoleProvider>
-      <Routes>
-        <Route element={<DashboardLayout />}>
-          <Route path="/" element={<SalonOperationsDashboard />} />
-          <Route path="/schedule" element={<MasterView />} /> {/* Legacy MasterView moved to schedule for now */}
-          <Route path="/clients" element={<ClientView />} />
-          <Route path="/inventory" element={<OwnerView />} /> {/* Using OwnerView as placeholder for Inventory */}
-        </Route>
-      </Routes>
+      <AuthGuard>
+        <Routes>
+          <Route element={<DashboardLayout />}>
+            <Route path="/" element={<SalonOperationsDashboard />} />
+            <Route path="/schedule" element={<MasterView />} /> {/* Legacy MasterView moved to schedule for now */}
+            <Route path="/clients" element={<ClientView />} />
+            <Route path="/inventory" element={<OwnerView />} /> {/* Using OwnerView as placeholder for Inventory */}
+          </Route>
+        </Routes>
+      </AuthGuard>
     </RoleProvider>
   );
 }

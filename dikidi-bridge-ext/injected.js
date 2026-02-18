@@ -20,7 +20,7 @@
 
         let foundCount = 0;
 
-        const processRecordData = (recordId, info) => {
+        const processRecordData = (recordId, info, masterId = null, debugLabel = null) => {
             // 1. External ID & Filtering
             const externalId = String(recordId);
 
@@ -69,15 +69,27 @@
                 status = 'paid';
             }
 
-            // 6. DATE VALIDATION (Double Check)
+            // 6. DATE VALIDATION (Relaxed for Debug)
             if (info.time_start) {
                 const apptDatePart = info.time_start.split(' ')[0]; // "2023-10-27"
                 const todayStr = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Tbilisi' });
 
-                if (apptDatePart !== todayStr) {
+                // If we are in "debug_fallback" mode, we might want to allow other dates, 
+                // BUT strict requirement was "Today-only". 
+                // However, user said "process ALL records... mark with debug_date".
+                // So if debugLabel is set, we bypass strict today check? 
+                // Let's keep strict check for now unless explicitly asked to ignore it for valid data.
+                // Actually, user said: "Temporary Override: ... process ALL records ... mark them".
+                // So we will ALLOW them if debugLabel is present.
+                if (apptDatePart !== todayStr && !debugLabel) {
                     return;
                 }
             }
+
+            // 7. Master ID Handling
+            let finalMasterId = masterId;
+            if (!finalMasterId && info.master_id) finalMasterId = info.master_id;
+            finalMasterId = finalMasterId ? String(finalMasterId) : null;
 
             const appointment = {
                 external_id: externalId,
@@ -85,7 +97,9 @@
                 service_name: serviceName,
                 service_price: price,
                 status: status,
-                appointment_time: info.time_start ? new Date(info.time_start).toISOString() : new Date().toISOString()
+                appointment_time: info.time_start ? new Date(info.time_start).toISOString() : new Date().toISOString(),
+                master_id: finalMasterId,
+                debug_date: debugLabel ? debugLabel : undefined
             };
 
             // Send to Content Script
@@ -130,58 +144,121 @@
 
             let todayAppointments = null;
 
-            // 1. Check data.masters.records.data -> [Date]
+            // 1. Check data.masters.records.data
             if (data.masters.records && data.masters.records.data) {
-                if (data.masters.records.data[todayStr]) {
-                    console.log("Dikidi Bridge: Found records for today in 'masters.records.data'");
-                    todayAppointments = data.masters.records.data[todayStr];
+                const recordsData = data.masters.records.data;
+                const availableKeys = Object.keys(recordsData);
+                // console.log("!!! DEBUG: Found keys in records.data:", availableKeys);
+
+                /* NEW: Detect if keys are Master IDs (Numeric) or Dates */
+                const isNumericKey = availableKeys.some(k => !isNaN(Number(k)) && k.length < 15); // Simple heuristic
+
+                if (isNumericKey) {
+                    console.log("Dikidi Bridge: Detected Master ID keys structure.");
+                    // Iterate Master IDs -> [Appointments]
+                    availableKeys.forEach(masterId => {
+                        const masterGroup = recordsData[masterId];
+                        if (!masterGroup) return;
+                        Object.entries(masterGroup).forEach(([apptId, apptData]) => {
+                            const candidate = apptData.info ? apptData.info : apptData;
+                            const hasId = candidate.id || apptId;
+                            if (hasId) {
+                                processRecordData(hasId, candidate, masterId); // Standard process
+                                foundCount++;
+                            }
+                        });
+                    });
+                }
+                // STANDARD: Date Keys
+                else {
+                    // A. Exact Match
+                    if (recordsData[todayStr]) {
+                        console.log("Dikidi Bridge: Exact match for today:", todayStr);
+                        todayAppointments = recordsData[todayStr];
+                        // Process Today
+                        if (todayAppointments) {
+                            Object.entries(todayAppointments).forEach(([masterId, masterGroup]) => {
+                                if (!masterGroup) return;
+                                Object.entries(masterGroup).forEach(([apptId, apptData]) => {
+                                    const candidate = apptData.info ? apptData.info : apptData;
+                                    const hasId = candidate.id || apptId;
+                                    if (hasId) {
+                                        processRecordData(hasId, candidate, masterId);
+                                        foundCount++;
+                                    }
+                                });
+                            });
+                        }
+                    }
+                    // B. Smart Match (Contains Day & Month)
+                    else {
+                        const day = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Tbilisi', day: '2-digit' });
+                        const month = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Tbilisi', month: '2-digit' });
+                        const match = availableKeys.find(k => k.includes(day) && k.includes(month));
+
+                        if (match) {
+                            console.log("Dikidi Bridge: Smart Match found:", match);
+                            const matchedGroup = recordsData[match];
+                            Object.entries(matchedGroup).forEach(([masterId, masterGroup]) => {
+                                if (!masterGroup) return;
+                                Object.entries(masterGroup).forEach(([apptId, apptData]) => {
+                                    const candidate = apptData.info ? apptData.info : apptData;
+                                    const hasId = candidate.id || apptId;
+                                    if (hasId) {
+                                        processRecordData(hasId, candidate, masterId);
+                                        foundCount++;
+                                    }
+                                });
+                            });
+                        } else {
+                            // C. Fallback: Process ALL keys
+                            console.warn("Dikidi Bridge: No Today match found. Processing ALL available keys with debug flag.");
+                            availableKeys.forEach(key => {
+                                const group = recordsData[key];
+                                if (!group) return;
+                                // In Date-Key structure: group is { masterId: { apptId: ... } }
+                                Object.entries(group).forEach(([masterId, masterRecords]) => {
+                                    if (!masterRecords) return;
+                                    Object.entries(masterRecords).forEach(([apptId, apptData]) => {
+                                        const candidate = apptData.info ? apptData.info : apptData;
+                                        const hasId = candidate.id || apptId;
+                                        if (hasId) {
+                                            processRecordData(hasId, candidate, masterId, `fallback_${key}`);
+                                            foundCount++;
+                                        }
+                                    });
+                                });
+                            });
+                        }
+                    }
                 }
             }
             // 2. Fallback: Check data.masters.data
             else if (data.masters.data) {
-                console.log("Dikidi Bridge: 'masters.data' path found. Processing all, relying on processRecordData validation.");
+                console.log("Dikidi Bridge: 'masters.data' path found. Processing all.");
                 todayAppointments = data.masters.data;
-            }
-
-            if (todayAppointments) {
-                try {
+                if (todayAppointments) {
                     Object.values(todayAppointments).forEach(masterGroup => {
-                        if (!masterGroup || typeof masterGroup !== 'object') return;
-
+                        if (!masterGroup) return;
                         Object.entries(masterGroup).forEach(([apptId, apptData]) => {
                             const candidate = apptData.info ? apptData.info : apptData;
-
-                            if (foundCount === 0) {
-                                console.log("Debug: First Appointment Candidate Keys:", Object.keys(candidate));
-                            }
-
                             const hasId = candidate.id || apptId;
-
                             if (hasId) {
                                 processRecordData(hasId, candidate);
                                 foundCount++;
                             }
                         });
                     });
-                } catch (err) {
-                    console.error("Error in specific extraction:", err);
                 }
             }
         }
-
-        /*
-        // STRATEGY 2: Generic Recursive Search (Fallback)
-        if (foundCount === 0) {
-            findAndExtract(data);
-        }
-        */
 
         // Fallback Logging if nothing found
         if (foundCount === 0) {
             console.log("!!! STEP 1 FAIL: URL matched but extraction logic returned null for", url);
             // SPECIFIC DEBUG FOR JOURNAL
             if (data.masters && data.masters.records && data.masters.records.data) {
-                console.log("Available Dates in Response:", Object.keys(data.masters.records.data));
+                console.log("Available Keys in Response:", Object.keys(data.masters.records.data));
             }
         }
     };
