@@ -1,4 +1,11 @@
-// background.js
+// background.js - Keep Alive Mechanism
+console.log("!!! Background Service Worker Started !!!");
+
+// Пинг каждые 20 секунд, чтобы Chrome не убивал процесс
+setInterval(() => {
+    console.log("ping (keep-alive)");
+    // Можно делать легкий fetch к чему-нибудь или просто лог
+}, 20000);
 
 const SUPABASE_URL = 'https://ozrpmpwnfrimjjrjsfms.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im96cnBtcHduZnJpbWpqcmpzZm1zIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzEzNjUzMzksImV4cCI6MjA4Njk0MTMzOX0.duUFlxQQ8afUmI7Bj0KtEY7bJkvfvsLZSwQ1aZzT1r4';
