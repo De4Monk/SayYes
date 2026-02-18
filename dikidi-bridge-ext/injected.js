@@ -60,14 +60,66 @@
             });
         };
 
-        findAndExtract(data);
+        // STRATEGY 1: Specific handling for Journal API structure
+        // User reports path: data.masters.records.data
+        // Logs suggested: data.masters.services.data (maybe?)
+        // We will try to find the 'data' holder safely
+        if (data.masters) {
+            let masterData = null;
+            if (data.masters.records && data.masters.records.data) {
+                console.log("Dikidi Bridge: 'masters.records.data' path found.");
+                masterData = data.masters.records.data;
+            } else if (data.masters.data) {
+                console.log("Dikidi Bridge: 'masters.data' path found.");
+                masterData = data.masters.data;
+            } else if (data.masters.services && data.masters.services.data) {
+                console.log("Dikidi Bridge: 'masters.services.data' path found.");
+                masterData = data.masters.services.data;
+            }
+
+            if (masterData) {
+                try {
+                    Object.values(masterData).forEach(masterAppointments => {
+                        if (!masterAppointments || typeof masterAppointments !== 'object') return;
+
+                        Object.entries(masterAppointments).forEach(([apptId, apptData]) => {
+                            // Sometimes the raw object is the data, sometimes it's wrapped
+                            const candidate = apptData.info ? apptData.info : apptData;
+
+                            // Debug first candidate keys if we haven't found anything yet
+                            if (foundCount === 0) {
+                                console.log("Debug: First Appointment Candidate Keys:", Object.keys(candidate));
+                            }
+
+                            // Relaxed heuristic for this specific path - we trust the structure more
+                            // If it has an ID, we try to process it
+                            const hasId = candidate.id || apptId;
+
+                            if (hasId) {
+                                processRecordData(hasId, candidate);
+                                foundCount++;
+                            }
+                        });
+                    });
+                } catch (err) {
+                    console.error("Error in specific extraction:", err);
+                }
+            }
+        }
+
+        // STRATEGY 2: Generic Recursive Search (Fallback)
+        if (foundCount === 0) {
+            findAndExtract(data);
+        }
 
         // Fallback Logging if nothing found
         if (foundCount === 0) {
             console.log("!!! STEP 1 FAIL: URL matched but extraction logic returned null for", url);
             console.log("JSON Root Keys:", Object.keys(data));
-            if (data.data && typeof data.data === 'object') {
-                console.log("JSON Data Keys:", Object.keys(data.data));
+
+            // SPECIFIC DEBUG FOR JOURNAL
+            if (data.masters) {
+                console.log("!!! DEBUG JOURNAL: 'masters' key found. Keys:", Object.keys(data.masters));
             }
         }
     };
@@ -86,7 +138,7 @@
         if (info.client && info.client.name) clientName = info.client.name;
         else if (info.client_name) clientName = info.client_name;
 
-        clientName = clientName.trim();
+        clientName = clientName ? clientName.trim() : 'Unknown Client';
 
         // 3. Service Name & Cleaning
         let serviceName = 'Unknown Service';
@@ -98,7 +150,7 @@
             serviceName = info.services[0].name || info.services[0].title || 'Service';
         }
 
-        serviceName = serviceName.trim();
+        serviceName = serviceName ? serviceName.trim() : 'Unknown Service';
 
         // 4. Price & Cost
         const price = parseFloat(info.cost || info.total_cost || info.price || 0);
