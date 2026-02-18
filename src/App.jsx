@@ -40,6 +40,8 @@ function App() {
             <Route path="/clients" element={<ClientView />} />
             <Route path="/inventory" element={<OwnerView />} /> {/* Using OwnerView as placeholder for Inventory */}
           </Route>
+          {/* 🔥 ЛОВУШКА ДЛЯ TELEGRAM МУСОРА В URL 🔥 */}
+          <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </AuthGuard>
     </RoleProvider>
