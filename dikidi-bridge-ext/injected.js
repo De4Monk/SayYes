@@ -155,18 +155,33 @@
 
                 if (isNumericKey) {
                     console.log("Dikidi Bridge: Detected Master ID keys structure.");
-                    // Iterate Master IDs -> [Appointments]
-                    availableKeys.forEach(masterId => {
-                        const masterGroup = recordsData[masterId];
-                        if (!masterGroup) return;
-                        Object.entries(masterGroup).forEach(([apptId, apptData]) => {
-                            const candidate = apptData.info ? apptData.info : apptData;
-                            const hasId = candidate.id || apptId;
+
+                    // Recursive helper to find appointments deep in structure
+                    const scanForAppointments = (obj, masterId) => {
+                        if (!obj || typeof obj !== 'object') return;
+
+                        // Check if this specific object IS an appointment (has client + service)
+                        const candidate = obj.info ? obj.info : obj;
+                        // Loose check for appointment-like properties
+                        const hasClient = (candidate.client || candidate.client_name || candidate.client_id);
+                        const hasServices = (candidate.services || candidate.services_title || candidate.service_name);
+
+                        if (hasClient && hasServices) {
+                            const hasId = candidate.id || obj.id;
                             if (hasId) {
-                                processRecordData(hasId, candidate, masterId); // Standard process
+                                processRecordData(hasId, candidate, masterId);
                                 foundCount++;
                             }
-                        });
+                            return; // Found it, stop digging this branch? Or dig for nested? usually flat here.
+                        }
+
+                        // If not, dig deeper
+                        Object.values(obj).forEach(val => scanForAppointments(val, masterId));
+                    };
+
+                    // Iterate Master IDs -> [Deep Scan]
+                    availableKeys.forEach(masterId => {
+                        scanForAppointments(recordsData[masterId], masterId);
                     });
                 }
                 // STANDARD: Date Keys
