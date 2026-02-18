@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
+import { useTelegram } from '../hooks/useTelegram';
 
 const RoleContext = createContext();
 
@@ -9,16 +10,16 @@ export const RoleProvider = ({ children }) => {
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState(null);
 
+    const { tg, user: tgUser, onToggleButton } = useTelegram();
+
     useEffect(() => {
         const initAuth = async () => {
             setIsLoading(true);
             try {
-                // 1. Get Telegram User
-                const tg = window.Telegram?.WebApp;
-                const tgUser = tg?.initDataUnsafe?.user;
+                // Wait for TG to be ready if possible, but we rely on the hook
 
                 if (tgUser) {
-                    console.log("Telegram User Detected:", tgUser);
+                    console.log("Telegram User Detected via Hook:", tgUser);
 
                     // 2. Fetch Profile from Supabase
                     const { data: profile, error } = await supabase
@@ -29,8 +30,7 @@ export const RoleProvider = ({ children }) => {
 
                     if (error) {
                         console.error("Error fetching profile:", error);
-                        // Handle case where profile doesn't exist? 
-                        // Maybe create a guest profile or just stay as default 'master' for dev?
+                        // If profile is missing, we might want to create one or handle it
                     } else if (profile) {
                         console.log("Profile Loaded:", profile);
                         setCurrentUser(profile);
@@ -39,31 +39,32 @@ export const RoleProvider = ({ children }) => {
                         }
                     }
                 } else {
-                    console.log("No Telegram User detected. Running in Dev/Browser mode?");
-                    // Optional: Check for local storage dev override
+                    console.log("No Telegram User detected via Hook. Environment:", import.meta.env.MODE);
+
+                    // Fallback for Dev/Browser Mode if Auth fails
+                    if (import.meta.env.DEV) {
+                        console.warn("⚠️ No Telegram User. Activating DEV MODE.");
+                        setCurrentUser({
+                            id: 'dev-admin-id',
+                            telegram_id: 'dev_admin',
+                            role: 'admin', // Default to Admin for easier testing
+                            native_name: 'Dev Admin'
+                        });
+                        setCurrentRole('admin');
+                    }
                 }
             } catch (err) {
                 console.error("Auth Init Error:", err);
-                // Fallback for Dev/Browser Mode if Auth fails
-                if (import.meta.env.DEV || !window.Telegram?.WebApp) {
-                    console.warn("⚠️ Auth Failed or No Telegram. Activating DEV MODE.");
-                    setCurrentUser({
-                        id: 'dev-admin-id',
-                        telegram_id: 'dev_admin',
-                        role: 'admin', // Default to Admin for easier testing
-                        native_name: 'Dev Admin'
-                    });
-                    setCurrentRole('admin');
-                } else {
-                    setError(err);
-                }
+                setError(err);
             } finally {
                 setIsLoading(false);
             }
         };
 
+        // Only run when tgUser is stable or we are sure it's not coming
+        // A simple timeout might be needed if SDK takes time to inject, but hook handles it well usually
         initAuth();
-    }, []);
+    }, [tgUser]);
 
     const switchRole = (role) => {
         setCurrentRole(role);

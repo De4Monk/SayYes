@@ -49,11 +49,26 @@
     @apply bg-white/80 backdrop-blur-md border-t border-zinc-200;
   }
   
-  /* Skeleton Loading Animation */
-  .skeleton-shimmer {
-      background: linear-gradient(90deg, #e0e0e0 25%, #f0f0f0 50%, #e0e0e0 75%);
-      background-size: 200% 100%;
-      animation: shimmer 1.5s infinite;
+    /* Safe Area Utilities */
+    .pb-safe {
+      padding-bottom: env(safe-area-inset-bottom, 20px);
+    }
+    .pt-safe {
+        padding-top: env(safe-area-inset-top, 0px);
+    }
+
+    /* Skeleton Loading Animation */
+    .skeleton-shimmer {
+        background: linear-gradient(90deg, #e0e0e0 25%, #f0f0f0 50%, #e0e0e0 75%);
+        background-size: 200% 100%;
+        animation: shimmer 1.5s infinite;
+    }
+}
+
+@layer base {
+  body {
+    /* Fix for iOS 100vh issue in Telegram */
+    min-height: var(--tg-viewport-height, 100vh);
   }
 }
 
