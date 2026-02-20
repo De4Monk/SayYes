@@ -3,6 +3,7 @@ import { Heading, Text } from '../atoms/Typography';
 import { DigitalMenuGrid } from '../organisms/DigitalMenuGrid';
 import { ClientProfile } from '../organisms/ClientProfile';
 import { BookingCard } from '../molecules/BookingCard';
+import { ClientNotificationSettings } from '../organisms/ClientNotificationSettings';
 
 export const ClientView = () => {
     return (
@@ -17,6 +18,8 @@ export const ClientView = () => {
             <DigitalMenuGrid />
 
             <ClientProfile />
+
+            <ClientNotificationSettings />
 
             {/* Additional spacing for bottom nav */}
             <div className="h-4" />

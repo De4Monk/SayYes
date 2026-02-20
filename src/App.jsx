@@ -11,6 +11,7 @@ import { Heading } from './components/atoms/Typography';
 import { AdminView } from './components/pages/AdminView';
 import { OwnerView } from './components/pages/OwnerView';
 import { ClientView } from './components/pages/ClientView';
+import { SettingsView } from './pages/SettingsView';
 
 const RoleBasedContent = () => {
   const { currentRole } = useRole();
@@ -39,6 +40,7 @@ function App() {
             <Route path="/schedule" element={<MasterView />} /> {/* Legacy MasterView moved to schedule for now */}
             <Route path="/clients" element={<ClientView />} />
             <Route path="/inventory" element={<OwnerView />} /> {/* Using OwnerView as placeholder for Inventory */}
+            <Route path="/settings" element={<SettingsView />} />
           </Route>
           {/* 🔥 ЛОВУШКА ДЛЯ TELEGRAM МУСОРА В URL 🔥 */}
           <Route path="*" element={<Navigate to="/" replace />} />

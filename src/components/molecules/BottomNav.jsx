@@ -7,6 +7,7 @@ export const BottomNav = () => {
         { name: 'Schedule', icon: 'calendar_month', path: '/schedule' },
         { name: 'Clients', icon: 'group', path: '/clients' },
         { name: 'Inventory', icon: 'inventory_2', path: '/inventory' },
+        { name: 'Settings', icon: 'settings', path: '/settings' },
     ];
 
     return (
@@ -25,8 +26,8 @@ export const BottomNav = () => {
                             <>
                                 <div
                                     className={`h-8 flex items-center justify-center transition-transform group-active:scale-90 ${isActive
-                                            ? 'text-primary'
-                                            : 'text-slate-400 group-hover:text-slate-600 dark:group-hover:text-slate-300'
+                                        ? 'text-primary'
+                                        : 'text-slate-400 group-hover:text-slate-600 dark:group-hover:text-slate-300'
                                         }`}
                                 >
                                     <span
@@ -38,8 +39,8 @@ export const BottomNav = () => {
                                 </div>
                                 <span
                                     className={`text-[10px] font-medium ${isActive
-                                            ? 'text-primary'
-                                            : 'text-slate-400 group-hover:text-slate-600 dark:group-hover:text-slate-300'
+                                        ? 'text-primary'
+                                        : 'text-slate-400 group-hover:text-slate-600 dark:group-hover:text-slate-300'
                                         }`}
                                 >
                                     {item.name}
