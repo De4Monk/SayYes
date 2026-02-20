@@ -82,11 +82,11 @@ export const SalonOperationsDashboard = () => {
             <header className="sticky top-0 z-20 bg-background-light/95 dark:bg-background-dark/95 backdrop-blur-sm px-4 pt-4 pb-2 border-b border-slate-200 dark:border-slate-800">
                 <div className="flex items-center justify-between mb-4">
                     <div>
-                        <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">{new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}</p>
+                        <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">{new Date().toLocaleDateString('ru-RU', { weekday: 'long', month: 'short', day: 'numeric' })}</p>
                         <h1 className="text-xl font-bold text-slate-900 dark:text-white mt-0.5">
                             {(currentRole === 'owner' || currentRole === 'admin')
                                 ? 'SayYes Salon'
-                                : `Hello, ${currentUser?.full_name || currentUser?.first_name || 'Master'}`
+                                : `Привет, ${currentUser?.full_name || currentUser?.first_name || 'Мастер'}`
                             }
                         </h1>
                     </div>
@@ -109,7 +109,7 @@ export const SalonOperationsDashboard = () => {
                     <div className="absolute -right-6 -top-6 w-32 h-32 bg-white/10 rounded-full blur-2xl group-hover:bg-white/20 transition-all duration-500"></div>
                     <div className="relative z-10 flex flex-col gap-1">
                         <div className="flex justify-between items-start">
-                            <p className="text-primary-50 text-sm font-medium tracking-wide">Today's Revenue</p>
+                            <p className="text-primary-50 text-sm font-medium tracking-wide">Выручка за сегодня</p>
                             <span className="material-symbols-outlined text-primary-100">payments</span>
                         </div>
                         <div className="flex items-baseline gap-2 mt-2">
@@ -120,7 +120,7 @@ export const SalonOperationsDashboard = () => {
                                 <span className="material-symbols-outlined text-[14px] mr-0.5">trending_up</span>
                                 --%
                             </div>
-                            <span className="text-primary-100 text-xs">vs last Tuesday</span>
+                            <span className="text-primary-100 text-xs">к прошлому вторнику</span>
                         </div>
                     </div>
                 </div>
@@ -132,14 +132,14 @@ export const SalonOperationsDashboard = () => {
                         <div className="h-12 w-12 rounded-full bg-primary/10 dark:bg-primary/20 flex items-center justify-center text-primary group-hover:bg-primary group-hover:text-white transition-colors duration-300">
                             <span className="material-symbols-outlined text-3xl">add</span>
                         </div>
-                        <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">New Booking</span>
+                        <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">Новая запись</span>
                     </NavLink>
                     {/* Check-in Client */}
                     <button className="bg-white dark:bg-slate-800 p-5 rounded-xl shadow-sm border border-slate-100 dark:border-slate-700 flex flex-col items-center justify-center gap-3 active:scale-95 transition-transform duration-150 min-h-[140px] group">
                         <div className="h-12 w-12 rounded-full bg-indigo-50 dark:bg-indigo-900/30 flex items-center justify-center text-indigo-600 dark:text-indigo-400 group-hover:bg-indigo-600 group-hover:text-white transition-colors duration-300">
                             <span className="material-symbols-outlined text-3xl">qr_code_scanner</span>
                         </div>
-                        <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">Check-in</span>
+                        <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">Чек-ин</span>
                     </button>
                 </div>
 
@@ -149,13 +149,13 @@ export const SalonOperationsDashboard = () => {
                 {/* Schedule Preview */}
                 <div>
                     <div className="flex items-center justify-between mb-3 px-1">
-                        <h3 className="text-lg font-bold text-slate-900 dark:text-white">Upcoming</h3>
-                        <NavLink to="/schedule" className="text-sm font-medium text-primary hover:text-primary/80">View Calendar</NavLink>
+                        <h3 className="text-lg font-bold text-slate-900 dark:text-white">Ближайшие</h3>
+                        <NavLink to="/schedule" className="text-sm font-medium text-primary hover:text-primary/80">Календарь</NavLink>
                     </div>
                     <div className="space-y-3">
-                        {loading && <div className="p-4 text-center text-slate-400">Loading...</div>}
+                        {loading && <div className="p-4 text-center text-slate-400">Загрузка...</div>}
                         {!loading && appointments.length === 0 && (
-                            <div className="p-4 text-center text-slate-400 bg-slate-50 rounded-xl">No appointments today</div>
+                            <div className="p-4 text-center text-slate-400 bg-slate-50 rounded-xl">На сегодня записей нет</div>
                         )}
                         {appointments.slice(0, 5).map((app) => {
                             // Check for Color Service

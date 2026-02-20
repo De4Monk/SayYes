@@ -84,7 +84,7 @@ export const DevAuth = () => {
                         <User size={16} />
                     </div>
                     <div className="flex flex-col">
-                        <span className="text-[10px] font-bold uppercase text-zinc-400">Logged In</span>
+                        <span className="text-[10px] font-bold uppercase text-zinc-400">В сети</span>
                         <span className="text-xs font-bold">{user.email?.split('@')[0]}</span>
                     </div>
                     <button onClick={handleLogout} className="ml-2 p-1 hover:bg-white/10 rounded-full">
@@ -102,7 +102,7 @@ export const DevAuth = () => {
                 disabled={loading}
                 className="shadow-2xl shadow-primary/50 text-xs px-4 py-2 h-auto"
             >
-                {loading ? 'Connecting...' : 'Dev Login'}
+                {loading ? 'Подключение...' : 'Dev Вход'}
             </Button>
         </div>
     );

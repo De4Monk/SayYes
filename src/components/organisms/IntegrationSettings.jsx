@@ -100,7 +100,7 @@ export const IntegrationSettings = () => {
 
             <div className="space-y-4">
                 <div>
-                    <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider mb-1 block">Telegram Bot Token</label>
+                    <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider mb-1 block">Токен Telegram бота</label>
                     <input
                         type="password"
                         value={botToken}
@@ -111,7 +111,7 @@ export const IntegrationSettings = () => {
                 </div>
 
                 <div>
-                    <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider mb-1 block">Green-API Instance ID</label>
+                    <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider mb-1 block">ID инстанса Green-API</label>
                     <input
                         type="text"
                         value={instanceId}
@@ -122,7 +122,7 @@ export const IntegrationSettings = () => {
                 </div>
 
                 <div>
-                    <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider mb-1 block">Green-API Token</label>
+                    <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider mb-1 block">Токен Green-API</label>
                     <input
                         type="password"
                         value={apiToken}

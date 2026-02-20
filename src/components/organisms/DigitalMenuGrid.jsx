@@ -6,10 +6,10 @@ import { Button } from '../atoms/Button';
 
 export const DigitalMenuGrid = () => {
     const menuItems = [
-        { id: 1, name: 'Cappuccino', type: 'Hot Drink', price: 0, icon: Coffee }, // 0 price = complimentary
-        { id: 2, name: 'Green Tea', type: 'Hot Drink', price: 0, icon: Coffee },
-        { id: 3, name: 'Prosecco', type: 'Alcohol', price: 8, icon: Wine },
-        { id: 4, name: 'Sparkling Water', type: 'Cold Drink', price: 0, icon: GlassWater },
+        { id: 1, name: 'Капучино', type: 'Горячие напитки', price: 0, icon: Coffee }, // 0 price = complimentary
+        { id: 2, name: 'Зеленый чай', type: 'Горячие напитки', price: 0, icon: Coffee },
+        { id: 3, name: 'Просекко', type: 'Алкоголь', price: 8, icon: Wine },
+        { id: 4, name: 'Газированная вода', type: 'Холодные напитки', price: 0, icon: GlassWater },
     ];
 
     const handleOrder = (item) => {
@@ -20,8 +20,8 @@ export const DigitalMenuGrid = () => {
     return (
         <div className="space-y-4">
             <div className="flex justify-between items-center">
-                <Heading level={2}>Bar & Refreshments</Heading>
-                <Text variant="caption" className="text-primary">Order to Chair</Text>
+                <Heading level={2}>Бар и напитки</Heading>
+                <Text variant="caption" className="text-primary">Заказ в кресло</Text>
             </div>
 
             <div className="grid grid-cols-2 gap-3">
@@ -42,7 +42,7 @@ export const DigitalMenuGrid = () => {
                         <div>
                             <div className="font-bold text-zinc-800">{item.name}</div>
                             <Text variant="caption" className={item.price === 0 ? "text-success" : "text-zinc-500"}>
-                                {item.price === 0 ? 'Complimentary' : `$${item.price.toFixed(2)}`}
+                                {item.price === 0 ? 'Бесплатно' : `$${item.price.toFixed(2)}`}
                             </Text>
                         </div>
                     </button>

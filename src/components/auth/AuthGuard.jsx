@@ -8,10 +8,10 @@ export const AuthGuard = ({ children }) => {
     if (error) {
         return (
             <div className="p-6 flex flex-col items-center justify-center h-screen bg-red-50 text-red-800">
-                <h2 className="text-xl font-bold mb-2">System Error</h2>
-                <p className="mb-4 text-center">{error.message || "Failed to initialize application"}</p>
+                <h2 className="text-xl font-bold mb-2">Системная ошибка</h2>
+                <p className="mb-4 text-center">{error.message || "Не удалось инициализировать приложение"}</p>
                 <button onClick={() => window.location.reload()} className="px-4 py-2 bg-red-600 text-white rounded-lg">
-                    Retry
+                    Повторить
                 </button>
             </div>
         );
@@ -22,7 +22,7 @@ export const AuthGuard = ({ children }) => {
         return (
             <div className="flex flex-col items-center justify-center h-screen bg-slate-50 dark:bg-slate-900">
                 <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
-                <p className="mt-4 text-sm text-slate-500 font-medium animate-pulse">Verifying Access...</p>
+                <p className="mt-4 text-sm text-slate-500 font-medium animate-pulse">Проверка доступа...</p>
             </div>
         );
     }
@@ -36,7 +36,7 @@ export const AuthGuard = ({ children }) => {
                         <span className="material-symbols-outlined text-3xl">lock</span>
                     </div>
 
-                    <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-2">Access Denied</h2>
+                    <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-2">Доступ запрещен</h2>
                     <p className="text-slate-500 dark:text-slate-400 mb-8">
                         Упс! Кажется, вас еще нет в системе SayYes ERP.
                     </p>
@@ -46,11 +46,11 @@ export const AuthGuard = ({ children }) => {
                         className="w-full bg-primary hover:bg-primary/90 text-white font-medium py-3.5 px-4 rounded-xl transition-all active:scale-95 flex items-center justify-center gap-2 shadow-lg shadow-primary/25"
                     >
                         <span className="material-symbols-outlined">send</span>
-                        Contact Admin
+                        Связаться с администратором
                     </button>
 
                     <p className="mt-6 text-xs text-slate-400">
-                        Please contact the administrator to get your access configured.
+                        Пожалуйста, обратитесь к администратору для настройки доступа.
                     </p>
                 </div>
             </div>

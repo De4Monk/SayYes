@@ -6,7 +6,7 @@ import { Button } from '../atoms/Button';
 
 export const BookingCard = ({ clientName, serviceName, time, status, onClick }) => {
     // Format time if it's a date string
-    const displayTime = time ? new Date(time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'TBD';
+    const displayTime = time ? new Date(time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Время не задано';
 
     return (
         <Card
@@ -20,10 +20,10 @@ export const BookingCard = ({ clientName, serviceName, time, status, onClick }) 
                     <div>
                         <div className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide mb-2 ${status === 'paid' ? 'bg-green-100 text-green-700' : 'bg-blue-50 text-primary'
                             }`}>
-                            {status || 'Scheduled'}
+                            {status === 'paid' ? 'Оплачено' : (status === 'cancelled' ? 'Отменено' : 'Запланировано')}
                         </div>
-                        <Heading level={3} className="text-slate-900">{clientName || 'Unknown Client'}</Heading>
-                        <Text className="text-slate-500 text-sm">{serviceName || 'Service'}</Text>
+                        <Heading level={3} className="text-slate-900">{clientName || 'Неизвестный клиент'}</Heading>
+                        <Text className="text-slate-500 text-sm">{serviceName || 'Услуга'}</Text>
                     </div>
                 </div>
 
@@ -39,7 +39,7 @@ export const BookingCard = ({ clientName, serviceName, time, status, onClick }) 
                         e.stopPropagation();
                         onClick();
                     }}>
-                        Check In / View
+                        Посмотреть / Чек-ин
                     </Button>
                 </div>
             </div>

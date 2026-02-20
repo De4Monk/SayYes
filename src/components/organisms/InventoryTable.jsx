@@ -53,12 +53,12 @@ export const InventoryTable = () => {
     return (
         <Card>
             <div className="flex justify-between items-center mb-4">
-                <Heading level={2}>Inventory</Heading>
+                <Heading level={2}>Склад</Heading>
                 <button
                     onClick={fetchInventory}
                     className="text-primary text-sm font-medium"
                 >
-                    Refresh
+                    Обновить
                 </button>
             </div>
 
@@ -66,10 +66,10 @@ export const InventoryTable = () => {
                 <table className="w-full text-sm text-left">
                     <thead className="text-zinc-500 border-b border-zinc-100">
                         <tr>
-                            <th className="pb-2 font-medium">Product</th>
-                            <th className="pb-2 font-medium">Type</th>
-                            <th className="pb-2 font-medium text-right">Qty</th>
-                            <th className="pb-2 font-medium text-right">Status</th>
+                            <th className="pb-2 font-medium">Продукт</th>
+                            <th className="pb-2 font-medium">Тип</th>
+                            <th className="pb-2 font-medium text-right">Кол-во</th>
+                            <th className="pb-2 font-medium text-right">Статус</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-zinc-50">
@@ -83,10 +83,10 @@ export const InventoryTable = () => {
                                 <td className="py-3 text-right font-medium">{item.quantity}</td>
                                 <td className="py-3 text-right">
                                     <span className={`px-2 py-1 rounded-full text-xs font-medium ${item.quantity < 3
-                                            ? 'bg-red-100 text-red-600'
-                                            : 'bg-emerald-100 text-emerald-600'
+                                        ? 'bg-red-100 text-red-600'
+                                        : 'bg-emerald-100 text-emerald-600'
                                         }`}>
-                                        {item.quantity < 3 ? 'Low' : 'OK'}
+                                        {item.quantity < 3 ? 'Мало' : 'ОК'}
                                     </span>
                                 </td>
                             </tr>
@@ -96,7 +96,7 @@ export const InventoryTable = () => {
 
                 {inventory.length === 0 && (
                     <div className="text-center py-6 text-zinc-400">
-                        No inventory items found.
+                        Товары на складе не найдены.
                     </div>
                 )}
             </div>

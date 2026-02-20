@@ -18,8 +18,11 @@
     <script type="module" src="/src/main.jsx"></script>
     <script src="https://unpkg.com/vconsole@latest/dist/vconsole.min.js"></script>
     <script>
-  // Включаем консоль только если мы на телефоне (или всегда для теста)
-      var vConsole = new VConsole();
+      // Включаем консоль только для конкретного администратора
+      const tgUser = window.Telegram?.WebApp?.initDataUnsafe?.user;
+      if (tgUser && (tgUser.id == 8004594500 || tgUser.username == '8004594500')) {
+        var vConsole = new VConsole();
+      }
     </script>
   </body>
 </html>

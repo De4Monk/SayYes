@@ -38,7 +38,7 @@ export const DyeCalculator = ({ appointment }) => {
                 grams_used: grams,
                 master_id: user?.id || null,
                 appointment_id: appointment?.id || null, // Link to real appointment!
-                notes: 'Manual dispense from DyeCalculator'
+                notes: 'Ручное списание из Калькулятора'
             });
 
             if (error) throw error;
@@ -48,7 +48,7 @@ export const DyeCalculator = ({ appointment }) => {
             // Optimistic UI update or toast here
         } catch (error) {
             console.error("Error dispensing:", error);
-            alert("Error logging usage: " + error.message);
+            alert("Ошибка сохранения: " + error.message);
         } finally {
             setLoading(false);
         }
@@ -56,7 +56,7 @@ export const DyeCalculator = ({ appointment }) => {
 
     return (
         <Card className="flex flex-col gap-4">
-            <Heading level={2}>Dye Calculator</Heading>
+            <Heading level={2}>Калькулятор красителя</Heading>
 
             {/* Display Screen */}
             <div className="bg-zinc-100 p-4 rounded-2xl text-right mb-2 border border-zinc-200">
@@ -70,14 +70,14 @@ export const DyeCalculator = ({ appointment }) => {
 
             <div className="grid grid-cols-2 gap-3 mt-2">
                 <button className="bg-primary/10 text-primary py-4 rounded-xl font-bold text-sm touch-target">
-                    Add Component
+                    Добавить компонент
                 </button>
                 <button
                     onClick={handleDispense}
                     disabled={loading}
                     className="bg-primary text-white py-4 rounded-xl font-bold text-sm touch-target shadow-lg shadow-primary/20 disabled:opacity-50"
                 >
-                    {loading ? 'Saving...' : 'Dispense & Log'}
+                    {loading ? 'Сохранение...' : 'Списать'}
                 </button>
             </div>
         </Card>

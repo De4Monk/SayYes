@@ -55,7 +55,7 @@ const AppointmentList = ({ onSelect }) => {
     if (error) {
         return (
             <div className="p-4 bg-red-50 text-red-500 rounded-xl">
-                Error loading appointments: {error}
+                Ошибка при загрузке записей: {error}
             </div>
         );
     }
@@ -63,14 +63,14 @@ const AppointmentList = ({ onSelect }) => {
     if (appointments.length === 0) {
         return (
             <div className="text-center py-10 bg-zinc-50 rounded-xl">
-                <Text className="text-zinc-400">No appointments found for today.</Text>
+                <Text className="text-zinc-400">На сегодня записей не найдено.</Text>
             </div>
         );
     }
 
     return (
         <div className="space-y-4">
-            <Heading level={2}>Today's Clients</Heading>
+            <Heading level={2}>Клиенты сегодня</Heading>
             <div className="grid gap-4">
                 {appointments.map((appt) => (
                     <BookingCard

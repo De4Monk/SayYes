@@ -35,7 +35,7 @@ export const AppointmentListItem = ({ time, clientName, serviceName, status, onC
                         onAddDye();
                     }}
                     className="mr-2 h-8 w-8 rounded-full bg-purple-50 dark:bg-purple-900/30 flex items-center justify-center text-purple-600 dark:text-purple-400 border border-purple-100 dark:border-purple-800"
-                    title="Add Dye Usage"
+                    title="Добавить расход красителя"
                 >
                     <span className="material-symbols-outlined text-lg">science</span>
                 </button>

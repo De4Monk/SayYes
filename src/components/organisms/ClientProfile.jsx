@@ -95,7 +95,7 @@ export const ClientProfile = ({ clientTelegramId }) => {
                 </div>
                 <div>
                     <Heading level={2}>Jane Doe</Heading>
-                    <Text>Platinum Member</Text>
+                    <Text>Платиновый статус</Text>
                 </div>
             </div>
 
@@ -104,9 +104,9 @@ export const ClientProfile = ({ clientTelegramId }) => {
                 <div className="flex justify-between items-end mb-2">
                     <div className="flex items-center gap-1 text-primary font-bold">
                         <Star size={16} fill="currentColor" />
-                        <span>{loyaltyPoints} pts</span>
+                        <span>{loyaltyPoints} баллов</span>
                     </div>
-                    <Text variant="caption">{nextTier - loyaltyPoints} to Black Tier</Text>
+                    <Text variant="caption">{nextTier - loyaltyPoints} до Черного статуса</Text>
                 </div>
                 <div className="h-2 bg-zinc-100 rounded-full overflow-hidden">
                     <div className="h-full bg-primary transition-all duration-1000" style={{ width: `${progress}%` }} />
@@ -115,7 +115,7 @@ export const ClientProfile = ({ clientTelegramId }) => {
 
             {/* History - Privacy First (No formulas) */}
             <div className="space-y-3 pt-2">
-                <Text variant="caption" className="ml-1">Recent Visits</Text>
+                <Text variant="caption" className="ml-1">Последние визиты</Text>
                 {history.map((visit) => (
                     <div key={visit.id} className="flex items-center justify-between p-3 bg-zinc-50 rounded-xl border border-zinc-100">
                         <div className="flex items-center gap-3">

@@ -9,8 +9,8 @@ export const ClientView = () => {
     return (
         <div className="space-y-8 pb-safe">
             <div className="mb-2">
-                <Heading level={1}>My Experience</Heading>
-                <Text>Welcome back, Jane</Text>
+                <Heading level={1}>Мой профиль</Heading>
+                <Text>С возвращением, Джейн</Text>
             </div>
 
             <BookingCard />

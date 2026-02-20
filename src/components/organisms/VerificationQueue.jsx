@@ -21,10 +21,10 @@ export const VerificationQueue = () => {
 
     return (
         <div className="space-y-4">
-            <Heading level={2}>Verification Queue</Heading>
+            <Heading level={2}>Очередь проверок</Heading>
             {pendingFormulas.length === 0 ? (
                 <Card className="p-8 text-center text-zinc-400">
-                    <Text>All caught up! No pending verifications.</Text>
+                    <Text>Все отлично! Нет формул ожидающих проверки.</Text>
                 </Card>
             ) : (
                 <div className="flex flex-col gap-3">
@@ -33,16 +33,16 @@ export const VerificationQueue = () => {
                             <div className="flex justify-between items-start">
                                 <div>
                                     <div className="font-bold text-zinc-800">{item.master}</div>
-                                    <Text variant="caption">Client: {item.client}</Text>
+                                    <Text variant="caption">Клиент: {item.client}</Text>
                                 </div>
                                 <div className="text-right">
                                     <div className="font-bold text-primary">${item.cost.toFixed(2)}</div>
-                                    <Text variant="caption">Est. Cost</Text>
+                                    <Text variant="caption">Примерная стоимость</Text>
                                 </div>
                             </div>
 
                             <div className="bg-zinc-50 p-3 rounded-xl border border-zinc-100">
-                                <Text variant="label" className="text-zinc-500 mb-1">Formula:</Text>
+                                <Text variant="label" className="text-zinc-500 mb-1">Формула:</Text>
                                 <div className="font-mono text-sm font-bold text-zinc-800">{item.formula}</div>
                             </div>
 
@@ -53,7 +53,7 @@ export const VerificationQueue = () => {
                                     className="bg-error/10 text-error shadow-none hover:bg-error/20"
                                     onClick={() => handleReject(item.id)}
                                 >
-                                    Reject
+                                    Отклонить
                                 </Button>
                                 <Button
                                     variant="primary"
@@ -61,7 +61,7 @@ export const VerificationQueue = () => {
                                     className="bg-success text-white shadow-success/20 hover:bg-success/90"
                                     onClick={() => handleApprove(item.id)}
                                 >
-                                    Approve
+                                    Одобрить
                                 </Button>
                             </div>
                         </Card>
