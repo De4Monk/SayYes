@@ -30,15 +30,15 @@ function verifyTelegramWebAppData(telegramInitData, botToken) {
         const initData = new URLSearchParams(telegramInitData);
         const hash = initData.get('hash');
         initData.delete('hash');
-        
+
         const dataToCheck = [...initData.entries()]
             .map(([key, val]) => `${key}=${val}`)
             .sort()
             .join('\n');
-            
+
         const secretKey = crypto.createHmac('sha256', 'WebAppData').update(botToken).digest();
         const calculatedHash = crypto.createHmac('sha256', secretKey).update(dataToCheck).digest('hex');
-        
+
         return calculatedHash === hash;
     } catch (e) {
         return false;
@@ -73,8 +73,8 @@ app.post('/auth/telegram', async (req, res) => {
         const payload = {
             aud: 'authenticated',
             role: 'authenticated',
-            sub: profile.id, 
-            email: `${profile.telegram_id}@telegram.local`, 
+            sub: profile.id,
+            email: `${profile.telegram_id}@telegram.local`,
             app_metadata: { provider: 'telegram' },
             user_metadata: {
                 tenant_id: profile.tenant_id,
@@ -194,13 +194,46 @@ async function sendTelegramMessage(task, botToken) {
 
 
 // ==========================================
-// БЛОК 3: WEBHOOKS (ОБРАТНАЯ СВЯЗЬ ОТ КЛИЕНТОВ)
+// БЛОК 3: WEBHOOKS (ОБРАТНАЯ СВЯЗЬ И КОМАНДЫ ОТ КЛИЕНТОВ)
 // ==========================================
 
 app.post('/webhook/telegram', async (req, res) => {
-    const callbackQuery = req.body.callback_query;
+    const body = req.body;
 
-    if (callbackQuery) {
+    // 1. Обработка входящих текстовых сообщений (команда /start)
+    if (body.message && body.message.text) {
+        const chatId = body.message.chat.id;
+        const text = body.message.text;
+
+        if (text === '/start') {
+            try {
+                await fetch(`https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/sendMessage`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        chat_id: chatId,
+                        text: "Добро пожаловать в SayYes! 💅\n\nЗдесь вы можете управлять своими записями, настраивать уведомления и вести учет. Нажмите кнопку ниже, чтобы войти в систему 👇",
+                        reply_markup: {
+                            inline_keyboard: [
+                                [{
+                                    text: "📱 Открыть приложение",
+                                    web_app: {
+                                        url: "https://sayyes-1028200460308.europe-west1.run.app"
+                                    }
+                                }]
+                            ]
+                        }
+                    })
+                });
+            } catch (err) {
+                console.error("Ошибка при отправке приветствия:", err);
+            }
+        }
+    }
+
+    // 2. Обработка нажатий на inline-кнопки (наше подтверждение визитов)
+    if (body.callback_query) {
+        const callbackQuery = body.callback_query;
         const data = callbackQuery.data;
         const chatId = callbackQuery.message.chat.id;
         const messageId = callbackQuery.message.message_id;
@@ -240,7 +273,7 @@ app.post('/webhook/telegram', async (req, res) => {
                     }
                 }
             } catch (err) {
-                console.error("Webhook processing error:", err);
+                console.error("Ошибка обработки вебхука подтверждения:", err);
             }
         }
     }

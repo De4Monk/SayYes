@@ -1,14 +1,20 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
+import { useRole } from '../../contexts/RoleContext';
 
 export const BottomNav = () => {
+    const { currentRole } = useRole();
+
     const navItems = [
-        { name: 'Home', icon: 'home', path: '/' },
-        { name: 'Schedule', icon: 'calendar_month', path: '/schedule' },
-        { name: 'Clients', icon: 'group', path: '/clients' },
-        { name: 'Inventory', icon: 'inventory_2', path: '/inventory' },
-        { name: 'Settings', icon: 'settings', path: '/settings' },
+        { name: 'Главная', icon: 'home', path: '/' },
+        { name: 'Записи', icon: 'calendar_month', path: '/schedule' },
+        { name: 'Клиенты', icon: 'group', path: '/clients' },
     ];
+
+    if (currentRole === 'admin' || currentRole === 'owner') {
+        navItems.push({ name: 'Управление', icon: 'dashboard', path: '/manage' });
+        navItems.push({ name: 'Уведомления', icon: 'notifications', path: '/settings' });
+    }
 
     return (
         <nav className="fixed bottom-0 left-0 right-0 z-30 bg-white dark:bg-slate-800 border-t border-slate-200 dark:border-slate-700 pb-safe pt-2 px-2">

@@ -30,6 +30,11 @@ const RoleBasedContent = () => {
   }
 };
 
+const ManageRoute = () => {
+  const { currentRole } = useRole();
+  return currentRole === 'owner' ? <OwnerView /> : <AdminView />;
+};
+
 function App() {
   return (
     <RoleProvider>
@@ -39,6 +44,7 @@ function App() {
             <Route path="/" element={<SalonOperationsDashboard />} />
             <Route path="/schedule" element={<MasterView />} /> {/* Legacy MasterView moved to schedule for now */}
             <Route path="/clients" element={<ClientView />} />
+            <Route path="/manage" element={<ManageRoute />} />
             <Route path="/inventory" element={<OwnerView />} /> {/* Using OwnerView as placeholder for Inventory */}
             <Route path="/settings" element={<SettingsView />} />
           </Route>
