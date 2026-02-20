@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { supabase } from '../lib/supabase';
+import { supabase, setSupabaseToken } from '../lib/supabase';
 import { useTelegram } from '../hooks/useTelegram';
 
 const RoleContext = createContext();
@@ -43,15 +43,9 @@ export const RoleProvider = ({ children }) => {
                     const responseData = await response.json();
 
                     if (responseData.token) {
-                        // Set Custom Session in Supabase
-                        const { error: sessionError } = await supabase.auth.setSession({
-                            access_token: responseData.token,
-                            refresh_token: responseData.token
-                        });
-
-                        if (sessionError) {
-                            throw new Error(`Failed to set Supabase session: ${sessionError.message}`);
-                        }
+                        // Используем наш кастомный инжектор токена в заголовки запросов
+                        // вместо системного Supabase Auth, чтобы избежать конфликта с GoTrue
+                        setSupabaseToken(responseData.token);
                     }
 
                     const profile = responseData.profile;

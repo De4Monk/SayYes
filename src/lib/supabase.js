@@ -1,14 +1,28 @@
 import { createClient } from '@supabase/supabase-js';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-if (!supabaseUrl || !supabaseKey) {
-    console.error("CRITICAL: Supabase config missing!", {
-        url: supabaseUrl ? 'Set' : 'Missing',
-        key: supabaseKey ? 'Set' : 'Missing'
-    });
-    throw new Error("supabaseUrl and supabaseKey are required. Check your .env file or build arguments.");
-}
+// Локальное хранилище для нашего кастомного токена
+let customAccessToken = null;
 
-export const supabase = createClient(supabaseUrl, supabaseKey);
+// Экспортируем функцию, которая будет "заряжать" клиент токеном
+export const setSupabaseToken = (token) => {
+    customAccessToken = token;
+    // Сразу авторизуем движок WebSockets (понадобится нам для Realtime)
+    supabase.realtime.setAuth(token);
+};
+
+export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+    global: {
+        fetch: (url, options) => {
+            // Перехватываем запрос: если у нас есть токен от Воркера, вставляем его в заголовок
+            if (customAccessToken) {
+                const headers = new Headers(options?.headers);
+                headers.set('Authorization', `Bearer ${customAccessToken}`);
+                return fetch(url, { ...options, headers });
+            }
+            return fetch(url, options);
+        }
+    }
+});
