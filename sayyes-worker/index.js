@@ -58,34 +58,56 @@ app.post('/auth/telegram', async (req, res) => {
     if (!isValid) return res.status(403).json({ error: 'Invalid Telegram Signature' });
 
     try {
-        // Ищем профиль пользователя в нашей БД
-        const { data: profile, error } = await supabase
+        // 1. Ищем профиль пользователя в таблице profiles (Мастера, Админы)
+        let { data: profile, error: profileError } = await supabase
             .from('profiles')
             .select('*')
             .eq('telegram_id', String(user.id))
             .single();
 
-        if (error || !profile) {
-            return res.status(404).json({ error: 'User not found in ERP' });
+        let authRole = null;
+        let authSub = null;
+        let tenantId = null;
+
+        if (profile) {
+            authRole = profile.role || 'authenticated';
+            authSub = profile.id;
+            tenantId = profile.tenant_id;
+        } else {
+            // 2. Если в profiles нет, ищем в clients
+            const { data: client, error: clientError } = await supabase
+                .from('clients')
+                .select('*')
+                .eq('telegram_id', String(user.id))
+                .single();
+
+            if (client) {
+                authRole = 'client';
+                authSub = client.id;
+                tenantId = client.tenant_id;
+                profile = client; // Возвращаем профиль клиента
+            } else {
+                return res.status(404).json({ error: 'User not found. Please send /start to the bot.' });
+            }
         }
 
         // Генерируем Custom JWT с зашитым tenant_id
         const payload = {
             aud: 'authenticated',
-            role: 'authenticated',
-            sub: profile.id,
-            email: `${profile.telegram_id}@telegram.local`,
+            role: 'authenticated', // Supabase требует строку 'authenticated' для доступа к RLS
+            sub: authSub,
+            email: `${user.id}@telegram.local`,
             app_metadata: { provider: 'telegram' },
             user_metadata: {
-                tenant_id: profile.tenant_id,
-                role: profile.role
+                tenant_id: tenantId,
+                role: authRole // Наша кастомная роль для Frontend (admin, master, client)
             }
         };
 
         const token = jwt.sign(payload, process.env.SUPABASE_JWT_SECRET, { expiresIn: '24h' });
 
         // Отдаем токен и профиль на фронтенд
-        res.json({ token, profile });
+        res.json({ token, profile: { ...profile, role: authRole } });
     } catch (err) {
         console.error('Auth logic error:', err);
         res.status(500).json({ error: 'Internal Server Error' });
@@ -212,22 +234,111 @@ app.post('/webhook/telegram', async (req, res) => {
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         chat_id: chatId,
-                        text: "Добро пожаловать в SayYes! 💅\n\nЗдесь вы можете управлять своими записями, настраивать уведомления и вести учет. Нажмите кнопку ниже, чтобы войти в систему 👇",
+                        text: "Добро пожаловать в SayYes! 💅\n\nЧтобы синхронизировать вашу историю визитов и бонусы, пожалуйста, поделитесь своим номером телефона, нажав кнопку ниже 👇",
                         reply_markup: {
-                            inline_keyboard: [
+                            keyboard: [
                                 [{
-                                    text: "📱 Открыть приложение",
-                                    web_app: {
-                                        url: "https://sayyes-1028200460308.europe-west1.run.app"
-                                    }
+                                    text: "📱 Поделиться контактом",
+                                    request_contact: true
                                 }]
-                            ]
+                            ],
+                            resize_keyboard: true,
+                            one_time_keyboard: true
                         }
                     })
                 });
             } catch (err) {
                 console.error("Ошибка при отправке приветствия:", err);
             }
+        }
+    }
+
+    // 2. Обработка получения контакта (регистрация/связывание)
+    if (body.message && body.message.contact) {
+        const chatId = body.message.chat.id;
+        const contact = body.message.contact;
+
+        // Ensure the sharing user is the sender (security)
+        if (contact.user_id !== chatId) {
+            return res.status(200).send('OK'); // Ignore forwarded contacts
+        }
+
+        // Форматируем телефон: оставляем только цифры, добавляем +
+        let phoneStr = contact.phone_number.replace(/\D/g, '');
+        if (!phoneStr.startsWith('+')) {
+            phoneStr = '+' + phoneStr;
+        }
+
+        try {
+            // Ищем клиента по телефону в нашей БД (Парсер Dikidi должен сохранять в таком же формате)
+            const { data: existingClient, error: searchError } = await supabase
+                .from('clients')
+                .select('*')
+                .eq('phone', phoneStr)
+                .single();
+
+            if (existingClient) {
+                // Если клиент есть, связываем его Telegram ID
+                await supabase
+                    .from('clients')
+                    .update({
+                        telegram_id: chatId,
+                        is_subscribed_tg: true
+                    })
+                    .eq('id', existingClient.id);
+            } else {
+                // Если клиента нет, создаем нового
+                // Получаем первый попавшийся tenant_id или используем default, если система multi-tenant
+                // В данном случае берем первый попавшийся профиль организации для привязки
+                const { data: tenantProfile } = await supabase
+                    .from('profiles')
+                    .select('tenant_id')
+                    .not('tenant_id', 'is', null)
+                    .limit(1)
+                    .single();
+
+                await supabase
+                    .from('clients')
+                    .insert({
+                        name: contact.first_name + (contact.last_name ? ' ' + contact.last_name : ''),
+                        phone: phoneStr,
+                        telegram_id: chatId,
+                        is_subscribed_tg: true,
+                        tenant_id: tenantProfile ? tenantProfile.tenant_id : null // Нужно продумать логику tenant_id для новых клиентов
+                    });
+            }
+
+            // Отправляем сообщение об успехе и кнопку открытия Mini App
+            await fetch(`https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/sendMessage`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    chat_id: chatId,
+                    text: "✅ Отлично! Ваш профиль синхронизирован.\n\nТеперь вы можете открыть личный кабинет 👇",
+                    reply_markup: {
+                        remove_keyboard: true, // Убираем обычную клавиатуру
+                        inline_keyboard: [
+                            [{
+                                text: "📱 Открыть приложение",
+                                web_app: {
+                                    url: "https://sayyes-1028200460308.europe-west1.run.app"
+                                }
+                            }]
+                        ]
+                    }
+                })
+            });
+
+        } catch (err) {
+            console.error("Ошибка при обработке контакта:", err);
+            await fetch(`https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/sendMessage`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    chat_id: chatId,
+                    text: "Произошла ошибка при синхронизации. Попробуйте позже."
+                })
+            });
         }
     }
 
