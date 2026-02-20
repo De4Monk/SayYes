@@ -1,62 +1,51 @@
-// background.js - Keep Alive Mechanism
-console.log("!!! Background Service Worker Started !!!");
+// background.js - Multi-tenant Version
+console.log("!!! Background Service Worker Started (Multi-tenant Mode) !!!");
 
-// Пинг каждые 20 секунд
-setInterval(() => {
-    console.log("ping (keep-alive)");
-}, 20000);
+setInterval(() => console.log("ping"), 20000);
 
 const SUPABASE_URL = 'https://ozrpmpwnfrimjjrjsfms.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im96cnBtcHduZnJpbWpqcmpzZm1zIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzEzNjUzMzksImV4cCI6MjA4Njk0MTMzOX0.duUFlxQQ8afUmI7Bj0KtEY7bJkvfvsLZSwQ1aZzT1r4';
 
+// ВСТАВЬ СЮДА UUID САЛОНА ИЗ ТАБЛИЦЫ tenants (Например: '123e4567-e89b-12d3-a456-426614174000')
+const TENANT_ID = '38925e3b-6047-4baf-b8f0-764336822231'; 
+
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-   
-    if (message.type === 'SYNC_APPOINTMENT' || message.type === 'DIKIDI_DATA') { 
+    if (message.type === 'SYNC_APPOINTMENT' || message.type === 'DIKIDI_SYNC_EVENT') {
         
-        const appointment = message.payload;
-        appointment.external_id = String(appointment.external_id);
+        const rawData = message.payload || message.detail;
+        if (!rawData) return;
 
-        console.log("!!! BRIDGE STEP 3: Attempting Supabase POST for ID:", appointment.external_id, "Price:", appointment.service_price);
-
-        const rpcPayload = {
-            external_id: String(appointment.external_id),
-            client_name: appointment.client_name,
-            client_phone: appointment.client_phone, // Добавил телефон, если он есть
-            service_name: appointment.service_name,
-            service_price: Number(appointment.service_price), // Гарантируем число
-            status: appointment.status,
-            
-            // Пробуем оба варианта времени (функция в БД "всеядная")
-            appointment_time: appointment.appointment_time || appointment.start_time,
-            start_time: appointment.appointment_time || appointment.start_time, 
-            
-            master_id: appointment.master_id ? String(appointment.master_id) : null,
-            master_dikidi_id: appointment.master_id ? String(appointment.master_id) : null
+        // Формируем плоский объект, где ключи = аргументы функции в Postgres
+        const rpcBody = {
+            p_tenant_id: TENANT_ID,
+            p_sync_secret: 'MySuperSecretKey2026', 
+            p_external_id: String(rawData.external_id),
+            p_client_name: rawData.client_name,
+            p_client_phone: rawData.client_phone || null,
+            p_service_name: rawData.service_name,
+            p_service_price: Number(rawData.service_price),
+            p_start_time: rawData.appointment_time || rawData.start_time,
+            p_status: rawData.status,
+            p_master_id: String(rawData.master_id || rawData.master_dikidi_id)
         };
-        // --------------------------------
+
+        console.log(`Sending Data. ID: ${rpcBody.p_external_id}, Price: ${rpcBody.p_service_price}`);
 
         fetch(`${SUPABASE_URL}/rest/v1/rpc/upsert_appointment_via_dikidi`, {
             method: 'POST',
-            mode: 'cors',
             headers: {
                 'apikey': SUPABASE_KEY,
                 'Authorization': `Bearer ${SUPABASE_KEY}`,
                 'Content-Type': 'application/json',
                 'Prefer': 'return=minimal'
             },
-            body: JSON.stringify(rpcPayload)
+            body: JSON.stringify(rpcBody) 
         })
-            .then(async response => {
-                if (!response.ok) {
-                    const text = await response.text();
-                    console.error("Supabase RPC Error:", response.status, text);
-                } else {
-                    console.log("✅ Dikidi Bridge: RPC Sync Success for", appointment.external_id);
-                }
-            })
-            .catch(error => {
-                console.error("Dikidi Bridge: Network/Fetch Failed", error);
-            });
+        .then(async res => {
+            if (res.ok) console.log("✅ DB Success!");
+            else console.error("❌ DB Error:", await res.text());
+        })
+        .catch(err => console.error("❌ Network Error:", err));
 
         return true;
     }

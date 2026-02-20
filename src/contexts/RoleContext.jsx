@@ -15,28 +15,54 @@ export const RoleProvider = ({ children }) => {
     useEffect(() => {
         const initAuth = async () => {
             setIsLoading(true);
+            setError(null);
             try {
                 // Wait for TG to be ready if possible, but we rely on the hook
 
                 if (tgUser) {
                     console.log("Telegram User Detected via Hook:", tgUser);
 
-                    // 2. Fetch Profile from Supabase
-                    const { data: profile, error } = await supabase
-                        .from('profiles')
-                        .select('*')
-                        .eq('telegram_id', tgUser.id)
-                        .single();
+                    // 2. Fetch Profile from Custom Backend
+                    const WORKER_URL = import.meta.env.VITE_WORKER_URL || 'http://localhost:8080';
+                    const response = await fetch(`${WORKER_URL}/auth/telegram`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            initData: tg.initData,
+                            user: tgUser
+                        })
+                    });
 
-                    if (error) {
-                        console.error("Error fetching profile:", error);
-                        // If profile is missing, we might want to create one or handle it
-                    } else if (profile) {
-                        console.log("Profile Loaded:", profile);
+                    if (!response.ok) {
+                        const errorData = await response.json().catch(() => ({}));
+                        throw new Error(errorData.message || `Auth Failed: ${response.status} ${response.statusText}`);
+                    }
+
+                    const responseData = await response.json();
+
+                    if (responseData.token) {
+                        // Set Custom Session in Supabase
+                        const { error: sessionError } = await supabase.auth.setSession({
+                            access_token: responseData.token,
+                            refresh_token: responseData.token
+                        });
+
+                        if (sessionError) {
+                            throw new Error(`Failed to set Supabase session: ${sessionError.message}`);
+                        }
+                    }
+
+                    const profile = responseData.profile;
+                    if (profile) {
+                        console.log("Profile Loaded from Backend:", profile);
                         setCurrentUser(profile);
                         if (profile.role) {
                             setCurrentRole(profile.role);
                         }
+                    } else {
+                        throw new Error("Profile data not found in backend response");
                     }
                 } else {
                     console.log("No Telegram User detected via Hook. Environment:", import.meta.env.MODE);

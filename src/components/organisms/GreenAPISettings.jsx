@@ -3,14 +3,35 @@ import { Card } from '../atoms/Card';
 import { Heading, Text } from '../atoms/Typography';
 import { Button } from '../atoms/Button';
 import { MessageCircle, Save } from 'lucide-react';
+import { supabase } from '../../lib/supabase';
+import { useRole } from '../../contexts/RoleContext';
 
 export const GreenAPISettings = () => {
+    const { currentUser } = useRole();
     const [instanceId, setInstanceId] = useState('');
     const [apiToken, setApiToken] = useState('');
 
-    const handleSave = () => {
-        console.log('Saving Green API settings:', { instanceId, apiToken });
-        // TODO: Save to RxDB/Supabase
+    const handleSave = async () => {
+        if (!currentUser?.id) {
+            console.error("No user id available to save settings.");
+            return;
+        }
+
+        const { data, error } = await supabase
+            .from('salon_integrations')
+            .upsert({
+                owner_profile_id: currentUser.id,
+                green_api_id_instance: instanceId,
+                green_api_token: apiToken,
+                updated_at: new Date().toISOString()
+            }, { onConflict: 'owner_profile_id' });
+
+        if (error) {
+            console.error('Ошибка сохранения интеграции:', error);
+            alert("Ошибка сохранения: " + error.message);
+        } else {
+            alert("Настройки Green-API успешно сохранены");
+        }
     };
 
     return (
