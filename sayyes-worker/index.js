@@ -183,7 +183,10 @@ async function processTask(task, integrations) {
             if (!integrations.telegram_bot_token) throw new Error('No Telegram token for this tenant');
             success = await sendTelegramMessage(task, integrations.telegram_bot_token);
         } else if (task.channel === 'whatsapp') {
-            success = await sendWhatsAppMessage(task);
+            if (!integrations.green_api_id_instance || !integrations.green_api_token) {
+                throw new Error('No Green API credentials for this tenant');
+            }
+            success = await sendWhatsAppMessage(task, integrations);
         }
 
         await supabase
@@ -201,17 +204,7 @@ async function processTask(task, integrations) {
     }
 }
 
-async function sendTelegramMessage(task, botToken) {
-    // 1. Достаем TG ID клиента и проверяем Opt-out
-    const { data: client, error: clientErr } = await supabase
-        .from('clients')
-        .select('telegram_id, is_subscribed_tg, name')
-        .eq('id', task.client_id)
-        .single();
-    if (clientErr || !client?.telegram_id || !client.is_subscribed_tg) {
-        throw new Error('Client unsubscribed or missing TG ID');
-    }
-    // 2. Получаем шаблон из БД
+async function buildMessageText(task, client) {
     const { data: template } = await supabase
         .from('notification_templates')
         .select('message_text')
@@ -243,6 +236,21 @@ async function sendTelegramMessage(task, botToken) {
                 .replace(/{{master_name}}/g, masterName);
         }
     }
+    return messageText;
+}
+
+async function sendTelegramMessage(task, botToken) {
+    // 1. Достаем TG ID клиента и проверяем Opt-out
+    const { data: client, error: clientErr } = await supabase
+        .from('clients')
+        .select('telegram_id, is_subscribed_tg, name')
+        .eq('id', task.client_id)
+        .single();
+    if (clientErr || !client?.telegram_id || !client.is_subscribed_tg) {
+        throw new Error('Client unsubscribed or missing TG ID');
+    }
+
+    const messageText = await buildMessageText(task, client);
     // 4. Формируем клавиатуру (Кнопки)
     let replyMarkup = undefined;
     if (task.template_type === 'reminder_24h') {
@@ -283,15 +291,8 @@ async function sendTelegramMessage(task, botToken) {
     return true;
 }
 
-async function sendWhatsAppMessage(task) {
-    const instanceId = process.env.GREEN_API_INSTANCE_ID;
-    const apiToken = process.env.GREEN_API_TOKEN;
-
-    if (!instanceId || !apiToken) {
-        throw new Error('GREEN_API_INSTANCE_ID or GREEN_API_TOKEN missing in environment');
-    }
-
-    // 1. Fetch client's phone number and check Opt-out
+async function sendWhatsAppMessage(task, integrations) {
+    // 1. Fetch client phone and check Opt-out
     const { data: client, error: clientErr } = await supabase
         .from('clients')
         .select('phone, is_subscribed_wa, name')
@@ -299,89 +300,35 @@ async function sendWhatsAppMessage(task) {
         .single();
 
     if (clientErr || !client?.phone || !client.is_subscribed_wa) {
-        throw new Error('Client unsubscribed or missing WhatsApp phone');
+        throw new Error('Client unsubscribed or missing WhatsApp phone number');
     }
 
-    // Format phone to WhatsApp format (e.g. 79991234567@c.us)
-    // Strip everything except numbers
-    let digits = client.phone.replace(/\D/g, '');
-    if (!digits) throw new Error(`Invalid phone format: ${client.phone}`);
-
-    // Quick validation format for Russian/Georgian numbers mostly, but keep it generic
-    // Ensure we don't start with '+' in the digits string
-    const whatsappId = `${digits}@c.us`;
-
-    // 2. Fetch template
-    const { data: template } = await supabase
-        .from('notification_templates')
-        .select('message_text')
-        .eq('type', task.template_type)
-        .single();
-
-    if (!template) throw new Error(`Template not found for type: ${task.template_type}`);
-    let messageText = template.message_text;
-
-    // 3. Parse variables
-    messageText = messageText.replace(/{{client_name}}/g, client.name || 'Гость');
-    messageText = messageText.replace(/{{salon_name}}/g, 'SayYes');
-
-    if (task.appointment_id) {
-        const { data: appt } = await supabase
-            .from('appointments')
-            .select('*')
-            .eq('id', task.appointment_id)
-            .single();
-
-        if (appt) {
-            let masterName = 'вашего мастера';
-            if (appt.master_id) {
-                const { data: master } = await supabase.from('profiles').select('full_name').eq('dikidi_master_id', appt.master_id).single();
-                if (master?.full_name) masterName = master.full_name;
-            }
-
-            const timeStr = new Date(appt.start_time).toLocaleTimeString('ru-RU', { timeZone: 'Asia/Tbilisi', hour: '2-digit', minute: '2-digit' });
-
-            messageText = messageText
-                .replace(/{{time}}/g, timeStr)
-                .replace(/{{service}}/g, appt.service_name || 'услугу')
-                .replace(/{{master_name}}/g, masterName);
-        }
+    // 2. Format phone number to E.164 (strip non-digits, replace a leading 8 with 7)
+    let cleanPhone = client.phone.replace(/\D/g, '');
+    if (cleanPhone.startsWith('8') && cleanPhone.length === 11) {
+        cleanPhone = '7' + cleanPhone.substring(1);
     }
+    const chatId = `${cleanPhone}@c.us`;
 
-    // 4. Adapt Buttons to Text Links
-    // WhatsApp doesn't support inline keyboards like TG. We append text instructions/links.
-    if (task.template_type === 'reminder_24h') {
-        messageText += '\n\n✅ Для подтверждения ответьте "Да"\n❌ Для отмены: свяжитесь с нами https://t.me/evgenii_sayyes';
-    } else if (task.template_type === 'feedback_request') {
-        const reviewUrl = 'https://taplink.cc/sayyes_ge'; // Fallback or fetch from settings
-        messageText += `\n\nОставьте свой отзыв по ссылке:\n${reviewUrl}`;
-    } else if (task.template_type === 'lost_client') {
-        messageText += `\n\n📅 Записаться онлайн:\nhttps://dikidi.net/ru`;
-    }
+    // 3. Parse variables using shared builder
+    const messageText = await buildMessageText(task, client);
 
-    // 5. Send payload to Green API
-    const url = `https://api.green-api.com/waInstance${instanceId}/sendMessage/${apiToken}`;
-    const payload = {
-        chatId: whatsappId,
-        message: messageText
-    };
-
+    // 4. Send via Green API
+    const url = `https://api.green-api.com/waInstance${integrations.green_api_id_instance}/sendMessage/${integrations.green_api_token}`;
     const response = await fetch(url, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json'
         },
-        body: JSON.stringify(payload)
+        body: JSON.stringify({
+            chatId: chatId,
+            message: messageText
+        })
     });
 
     if (!response.ok) {
-        const errText = await response.text();
-        throw new Error(`Green API Error: ${response.status} ${errText}`);
-    }
-
-    const data = await response.json();
-    if (!data.idMessage) {
-        throw new Error(`Green API failed to return idMessage: ${JSON.stringify(data)}`);
+        const errorData = await response.text();
+        throw new Error(`Green API Error: ${response.statusText} - ${errorData}`);
     }
 
     return true;
@@ -418,7 +365,7 @@ app.post('/webhook/telegram', async (req, res) => {
                                 }],
                                 [{
                                     text: "📅 Записаться онлайн",
-                                    url: "https://dikidi.net/ru" // Заглушка, Владелец потом вставит свою ссылку
+                                    url: "https://dikidi.net/887914" // Заглушка, Владелец потом вставит свою ссылку
                                 }]
                             ]
                         }
@@ -660,112 +607,6 @@ app.post('/webhook/telegram', async (req, res) => {
     }
 
     res.status(200).send('OK');
-});
-
-// ==========================================
-// БЛОК 4: DIKIDI WEBHOOK (Синхронизация записей)
-// ==========================================
-
-app.post('/webhook/dikidi', async (req, res) => {
-    try {
-        // Проверка Secret Key для безопасности (если настроен в Dikidi Webhooks)
-        const secret = req.query.token;
-        if (process.env.DIKIDI_WEBHOOK_SECRET && secret !== process.env.DIKIDI_WEBHOOK_SECRET) {
-            console.error('[DIKIDI WEBHOOK] Invalid or missing token');
-            return res.status(401).send('Unauthorized');
-        }
-
-        const payload = req.body;
-        console.log(`[DIKIDI WEBHOOK] Received payload:`, JSON.stringify(payload));
-
-        // Dikidi может слать массив событий или объект. Приведем к массиву.
-        const events = Array.isArray(payload) ? payload : [payload];
-
-        for (const event of events) {
-            const eventType = event.event || event.action; // depending on payload version
-            const record = event.record || event.data; // extracting appointment record
-
-            if (!record) continue;
-
-            // 1. Обработка Клиента
-            let dbClientId = null;
-            if (record.client && record.client.phone) {
-                // Очистка номера от + и () - оставляем только цифры
-                const rawPhone = record.client.phone.replace(/\D/g, '');
-                const formattedPhone = `+${rawPhone}`;
-
-                // Upsert клиента по номеру телефона
-                const { data: clientData, error: clientErr } = await supabase
-                    .from('clients')
-                    .upsert(
-                        {
-                            phone: formattedPhone,
-                            name: record.client.name,
-                            // tenant_id можно брать из профиля мастера или захардкодить на 1, если пока 1 арендатор (SayYes)
-                            tenant_id: 'default' // placeholder
-                        },
-                        { onConflict: 'phone' }
-                    )
-                    .select('id')
-                    .single();
-
-                if (clientErr) {
-                    console.error('[DIKIDI WEBHOOK] Client upsert error:', clientErr);
-                } else if (clientData) {
-                    dbClientId = clientData.id;
-                }
-            }
-
-            // 2. Обработка Статуса и Записи
-            // Статус в Dikidi может быть числовым или строковым (например, 2 - активна, 3 - отменена)
-            let appointmentStatus = 'scheduled';
-            if (eventType === 'record.delete' || eventType === 'delete' || record.status === 3 || record.status === 'cancelled') {
-                appointmentStatus = 'cancelled';
-            }
-
-            if (record.id) {
-                // Upsert Записи
-                let startTime = record.datetime || record.date; // Зависит от формата. Ожидаем ISO-подобную строку или 'YYYY-MM-DD HH:mm:ss'
-                // Важно: если приходит просто локальное время Dikidi, его нужно правильно сконвертировать.
-                // Для простоты сохраняем как есть, если это ISO, или парсим в UTC+4
-
-                let serviceName = 'Услуга';
-                let price = 0;
-                if (record.services && record.services.length > 0) {
-                    serviceName = record.services.map(s => s.name).join(', ');
-                    price = record.services.reduce((acc, s) => acc + (parseFloat(s.price) || 0), 0);
-                }
-
-                const appointmentPayload = {
-                    dikidi_record_id: record.id.toString(),
-                    client_id: dbClientId,
-                    master_id: record.master?.id ? record.master.id.toString() : null,
-                    service_name: serviceName,
-                    price: price,
-                    status: appointmentStatus,
-                    // Временная заглушка tenant_id: 1, чтобы обходить RLS если нужно.
-                    // В реальном flow нужно прокидывать настоящий tenant_id.
-                };
-
-                // Если это не отмена и дата есть, добавляем start_time. В противном случае - оставляем старую.
-                if (startTime && appointmentStatus !== 'cancelled') {
-                    // Конвертация формата "2023-10-25 14:00:00" в ISO, если нужно. (Для простоты пока скармливаем PostgREST как есть).
-                    appointmentPayload.start_time = startTime;
-                }
-
-                const { error: apptErr } = await supabase
-                    .from('appointments')
-                    .upsert(appointmentPayload, { onConflict: 'dikidi_record_id' });
-
-                if (apptErr) console.error('[DIKIDI WEBHOOK] Appointment upsert error:', apptErr);
-            }
-        }
-
-        res.status(200).send('Webhook processed');
-    } catch (err) {
-        console.error('[DIKIDI WEBHOOK] Error:', err);
-        res.status(500).send('Internal Server Error');
-    }
 });
 
 const port = process.env.PORT || 8080;
