@@ -183,8 +183,7 @@ async function processTask(task, integrations) {
             if (!integrations.telegram_bot_token) throw new Error('No Telegram token for this tenant');
             success = await sendTelegramMessage(task, integrations.telegram_bot_token);
         } else if (task.channel === 'whatsapp') {
-            // success = await sendWhatsAppMessage(task, integrations);
-            success = true;
+            success = await sendWhatsAppMessage(task);
         }
 
         await supabase
@@ -281,6 +280,110 @@ async function sendTelegramMessage(task, botToken) {
         })
     });
     if (!response.ok) throw new Error(`TG API Error: ${response.statusText}`);
+    return true;
+}
+
+async function sendWhatsAppMessage(task) {
+    const instanceId = process.env.GREEN_API_INSTANCE_ID;
+    const apiToken = process.env.GREEN_API_TOKEN;
+
+    if (!instanceId || !apiToken) {
+        throw new Error('GREEN_API_INSTANCE_ID or GREEN_API_TOKEN missing in environment');
+    }
+
+    // 1. Fetch client's phone number and check Opt-out
+    const { data: client, error: clientErr } = await supabase
+        .from('clients')
+        .select('phone, is_subscribed_wa, name')
+        .eq('id', task.client_id)
+        .single();
+
+    if (clientErr || !client?.phone || !client.is_subscribed_wa) {
+        throw new Error('Client unsubscribed or missing WhatsApp phone');
+    }
+
+    // Format phone to WhatsApp format (e.g. 79991234567@c.us)
+    // Strip everything except numbers
+    let digits = client.phone.replace(/\D/g, '');
+    if (!digits) throw new Error(`Invalid phone format: ${client.phone}`);
+
+    // Quick validation format for Russian/Georgian numbers mostly, but keep it generic
+    // Ensure we don't start with '+' in the digits string
+    const whatsappId = `${digits}@c.us`;
+
+    // 2. Fetch template
+    const { data: template } = await supabase
+        .from('notification_templates')
+        .select('message_text')
+        .eq('type', task.template_type)
+        .single();
+
+    if (!template) throw new Error(`Template not found for type: ${task.template_type}`);
+    let messageText = template.message_text;
+
+    // 3. Parse variables
+    messageText = messageText.replace(/{{client_name}}/g, client.name || 'Гость');
+    messageText = messageText.replace(/{{salon_name}}/g, 'SayYes');
+
+    if (task.appointment_id) {
+        const { data: appt } = await supabase
+            .from('appointments')
+            .select('*')
+            .eq('id', task.appointment_id)
+            .single();
+
+        if (appt) {
+            let masterName = 'вашего мастера';
+            if (appt.master_id) {
+                const { data: master } = await supabase.from('profiles').select('full_name').eq('dikidi_master_id', appt.master_id).single();
+                if (master?.full_name) masterName = master.full_name;
+            }
+
+            const timeStr = new Date(appt.start_time).toLocaleTimeString('ru-RU', { timeZone: 'Asia/Tbilisi', hour: '2-digit', minute: '2-digit' });
+
+            messageText = messageText
+                .replace(/{{time}}/g, timeStr)
+                .replace(/{{service}}/g, appt.service_name || 'услугу')
+                .replace(/{{master_name}}/g, masterName);
+        }
+    }
+
+    // 4. Adapt Buttons to Text Links
+    // WhatsApp doesn't support inline keyboards like TG. We append text instructions/links.
+    if (task.template_type === 'reminder_24h') {
+        messageText += '\n\n✅ Для подтверждения ответьте "Да"\n❌ Для отмены: свяжитесь с нами https://t.me/evgenii_sayyes';
+    } else if (task.template_type === 'feedback_request') {
+        const reviewUrl = 'https://taplink.cc/sayyes_ge'; // Fallback or fetch from settings
+        messageText += `\n\nОставьте свой отзыв по ссылке:\n${reviewUrl}`;
+    } else if (task.template_type === 'lost_client') {
+        messageText += `\n\n📅 Записаться онлайн:\nhttps://dikidi.net/ru`;
+    }
+
+    // 5. Send payload to Green API
+    const url = `https://api.green-api.com/waInstance${instanceId}/sendMessage/${apiToken}`;
+    const payload = {
+        chatId: whatsappId,
+        message: messageText
+    };
+
+    const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(payload)
+    });
+
+    if (!response.ok) {
+        const errText = await response.text();
+        throw new Error(`Green API Error: ${response.status} ${errText}`);
+    }
+
+    const data = await response.json();
+    if (!data.idMessage) {
+        throw new Error(`Green API failed to return idMessage: ${JSON.stringify(data)}`);
+    }
+
     return true;
 }
 
