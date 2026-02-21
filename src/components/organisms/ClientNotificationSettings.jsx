@@ -5,8 +5,9 @@ import { Bell, BellOff, MessageCircle } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useRole } from '../../contexts/RoleContext';
 
-export const ClientNotificationSettings = () => {
+export const ClientNotificationSettings = ({ clientId }) => {
     const { currentUser } = useRole();
+    const targetId = clientId || currentUser?.id;
     const [isLoading, setIsLoading] = useState(true);
     const [settings, setSettings] = useState({
         is_subscribed_tg: true,
@@ -16,7 +17,7 @@ export const ClientNotificationSettings = () => {
 
     useEffect(() => {
         const fetchSettings = async () => {
-            if (!currentUser?.telegram_id) {
+            if (!targetId) {
                 setIsLoading(false);
                 return;
             }
@@ -25,7 +26,7 @@ export const ClientNotificationSettings = () => {
                 const { data, error } = await supabase
                     .from('clients')
                     .select('is_subscribed_tg, is_subscribed_wa')
-                    .eq('telegram_id', currentUser.telegram_id)
+                    .eq('id', targetId)
                     .single();
 
                 if (error && error.code !== 'PGRST116') {
@@ -44,10 +45,10 @@ export const ClientNotificationSettings = () => {
         };
 
         fetchSettings();
-    }, [currentUser?.telegram_id]);
+    }, [targetId]);
 
     const toggleSubscription = async (channel, currentValue) => {
-        if (!currentUser?.telegram_id) return;
+        if (!targetId) return;
         setIsUpdating(channel);
 
         try {
@@ -59,7 +60,7 @@ export const ClientNotificationSettings = () => {
             const { error } = await supabase
                 .from('clients')
                 .update(updateData)
-                .eq('telegram_id', currentUser.telegram_id);
+                .eq('id', targetId);
 
             if (error) throw error;
 
