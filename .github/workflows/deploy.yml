@@ -7,7 +7,6 @@ on:
 
 env:
   PROJECT_ID: sayyes-beauty
-  SERVICE_NAME: sayyes
   REGION: europe-west1
   GAR_LOCATION: europe-west1
 
@@ -17,52 +16,56 @@ jobs:
     permissions:
       contents: 'read'
       id-token: 'write'
+    
+    strategy:
+      matrix:
+        include:
+          - service: sayyes
+            context: .
+            name: Frontend
+          - service: sayyes-worker
+            context: ./sayyes-worker
+            name: Worker
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # Verify secret existence (Optional sanity check)
-      - name: Verify Secrets
-        run: |
-          if [ -z "${{ secrets.GCP_SA_KEY }}" ]; then echo "::error::GCP_SA_KEY is missing"; exit 1; fi
-          if [ -z "${{ secrets.VITE_SUPABASE_URL }}" ]; then echo "::error::VITE_SUPABASE_URL is missing"; exit 1; fi
-          if [ -z "${{ secrets.VITE_SUPABASE_ANON_KEY }}" ]; then echo "::error::VITE_SUPABASE_ANON_KEY is missing"; exit 1; fi
-
-      # Authenticate to Google Cloud
       - name: Google Auth
         id: auth
         uses: google-github-actions/auth@v2
         with:
           credentials_json: '${{ secrets.GCP_SA_KEY }}'
 
-      # Set up Cloud SDK
       - name: Set up Cloud SDK
         uses: google-github-actions/setup-gcloud@v2
 
-      # Configure Docker to use Google Cloud credentials
       - name: Configure Docker
         run: gcloud auth configure-docker --quiet
 
-      # Build and Push Container using Docker directly
       - name: Build and Push Container
         run: |
-          docker build --no-cache \
-            --build-arg VITE_SUPABASE_URL="${{ secrets.VITE_SUPABASE_URL }}" \
-            --build-arg VITE_SUPABASE_ANON_KEY="${{ secrets.VITE_SUPABASE_ANON_KEY }}" \
-            -t gcr.io/${{ env.PROJECT_ID }}/${{ env.SERVICE_NAME }}:${{ github.sha }} .
-          docker push gcr.io/${{ env.PROJECT_ID }}/${{ env.SERVICE_NAME }}:${{ github.sha }}
+          if [ "${{ matrix.service }}" == "sayyes" ]; then
+            docker build --no-cache \
+              --build-arg VITE_SUPABASE_URL="${{ secrets.VITE_SUPABASE_URL }}" \
+              --build-arg VITE_SUPABASE_ANON_KEY="${{ secrets.VITE_SUPABASE_ANON_KEY }}" \
+              -t gcr.io/${{ env.PROJECT_ID }}/${{ matrix.service }}:${{ github.sha }} ${{ matrix.context }}
+          else
+            docker build --no-cache \
+              -t gcr.io/${{ env.PROJECT_ID }}/${{ matrix.service }}:${{ github.sha }} ${{ matrix.context }}
+          fi
+          docker push gcr.io/${{ env.PROJECT_ID }}/${{ matrix.service }}:${{ github.sha }}
 
-      # Deploy to Cloud Run
       - name: Deploy to Cloud Run
         id: deploy
         uses: google-github-actions/deploy-cloudrun@v2
         with:
-          image: gcr.io/${{ env.PROJECT_ID }}/${{ env.SERVICE_NAME }}:${{ github.sha }}
-          service: ${{ env.SERVICE_NAME }}
+          image: gcr.io/${{ env.PROJECT_ID }}/${{ matrix.service }}:${{ github.sha }}
+          service: ${{ matrix.service }}
           region: ${{ env.REGION }}
           project_id: ${{ env.PROJECT_ID }}
           flags: '--allow-unauthenticated'
 
       - name: Show Output
-        run: echo ${{ steps.deploy.outputs.url }}
+        run: echo Deployed ${{ matrix.name }} to ${{ steps.deploy.outputs.url }}
+
