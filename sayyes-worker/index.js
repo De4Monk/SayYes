@@ -87,7 +87,26 @@ app.post('/auth/telegram', async (req, res) => {
                 tenantId = client.tenant_id;
                 profile = client; // Возвращаем профиль клиента
             } else {
-                return res.status(404).json({ error: 'User not found. Please send /start to the bot.' });
+                // АВТО-РЕГИСТРАЦИЯ: Если юзер зашел впервые, создаем профиль клиента
+                const { data: newClient, error: insertError } = await supabase
+                    .from('clients')
+                    .insert({
+                        telegram_id: String(user.id),
+                        name: user.first_name + (user.last_name ? ' ' + user.last_name : ''),
+                        is_subscribed_tg: true
+                    })
+                    .select()
+                    .single();
+
+                if (insertError) {
+                    console.error('Auto-registration error:', insertError);
+                    return res.status(500).json({ error: 'Failed to create new user' });
+                }
+
+                authRole = 'client';
+                authSub = newClient.id;
+                tenantId = null;
+                profile = { ...newClient, role: 'client' };
             }
         }
 
