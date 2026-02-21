@@ -662,6 +662,112 @@ app.post('/webhook/telegram', async (req, res) => {
     res.status(200).send('OK');
 });
 
+// ==========================================
+// БЛОК 4: DIKIDI WEBHOOK (Синхронизация записей)
+// ==========================================
+
+app.post('/webhook/dikidi', async (req, res) => {
+    try {
+        // Проверка Secret Key для безопасности (если настроен в Dikidi Webhooks)
+        const secret = req.query.token;
+        if (process.env.DIKIDI_WEBHOOK_SECRET && secret !== process.env.DIKIDI_WEBHOOK_SECRET) {
+            console.error('[DIKIDI WEBHOOK] Invalid or missing token');
+            return res.status(401).send('Unauthorized');
+        }
+
+        const payload = req.body;
+        console.log(`[DIKIDI WEBHOOK] Received payload:`, JSON.stringify(payload));
+
+        // Dikidi может слать массив событий или объект. Приведем к массиву.
+        const events = Array.isArray(payload) ? payload : [payload];
+
+        for (const event of events) {
+            const eventType = event.event || event.action; // depending on payload version
+            const record = event.record || event.data; // extracting appointment record
+
+            if (!record) continue;
+
+            // 1. Обработка Клиента
+            let dbClientId = null;
+            if (record.client && record.client.phone) {
+                // Очистка номера от + и () - оставляем только цифры
+                const rawPhone = record.client.phone.replace(/\D/g, '');
+                const formattedPhone = `+${rawPhone}`;
+
+                // Upsert клиента по номеру телефона
+                const { data: clientData, error: clientErr } = await supabase
+                    .from('clients')
+                    .upsert(
+                        {
+                            phone: formattedPhone,
+                            name: record.client.name,
+                            // tenant_id можно брать из профиля мастера или захардкодить на 1, если пока 1 арендатор (SayYes)
+                            tenant_id: 'default' // placeholder
+                        },
+                        { onConflict: 'phone' }
+                    )
+                    .select('id')
+                    .single();
+
+                if (clientErr) {
+                    console.error('[DIKIDI WEBHOOK] Client upsert error:', clientErr);
+                } else if (clientData) {
+                    dbClientId = clientData.id;
+                }
+            }
+
+            // 2. Обработка Статуса и Записи
+            // Статус в Dikidi может быть числовым или строковым (например, 2 - активна, 3 - отменена)
+            let appointmentStatus = 'scheduled';
+            if (eventType === 'record.delete' || eventType === 'delete' || record.status === 3 || record.status === 'cancelled') {
+                appointmentStatus = 'cancelled';
+            }
+
+            if (record.id) {
+                // Upsert Записи
+                let startTime = record.datetime || record.date; // Зависит от формата. Ожидаем ISO-подобную строку или 'YYYY-MM-DD HH:mm:ss'
+                // Важно: если приходит просто локальное время Dikidi, его нужно правильно сконвертировать.
+                // Для простоты сохраняем как есть, если это ISO, или парсим в UTC+4
+
+                let serviceName = 'Услуга';
+                let price = 0;
+                if (record.services && record.services.length > 0) {
+                    serviceName = record.services.map(s => s.name).join(', ');
+                    price = record.services.reduce((acc, s) => acc + (parseFloat(s.price) || 0), 0);
+                }
+
+                const appointmentPayload = {
+                    dikidi_record_id: record.id.toString(),
+                    client_id: dbClientId,
+                    master_id: record.master?.id ? record.master.id.toString() : null,
+                    service_name: serviceName,
+                    price: price,
+                    status: appointmentStatus,
+                    // Временная заглушка tenant_id: 1, чтобы обходить RLS если нужно.
+                    // В реальном flow нужно прокидывать настоящий tenant_id.
+                };
+
+                // Если это не отмена и дата есть, добавляем start_time. В противном случае - оставляем старую.
+                if (startTime && appointmentStatus !== 'cancelled') {
+                    // Конвертация формата "2023-10-25 14:00:00" в ISO, если нужно. (Для простоты пока скармливаем PostgREST как есть).
+                    appointmentPayload.start_time = startTime;
+                }
+
+                const { error: apptErr } = await supabase
+                    .from('appointments')
+                    .upsert(appointmentPayload, { onConflict: 'dikidi_record_id' });
+
+                if (apptErr) console.error('[DIKIDI WEBHOOK] Appointment upsert error:', apptErr);
+            }
+        }
+
+        res.status(200).send('Webhook processed');
+    } catch (err) {
+        console.error('[DIKIDI WEBHOOK] Error:', err);
+        res.status(500).send('Internal Server Error');
+    }
+});
+
 const port = process.env.PORT || 8080;
 app.listen(port, () => {
     console.log(`Worker listening on port ${port}`);
