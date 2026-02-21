@@ -7,24 +7,25 @@ import { DyeCalculator } from '../organisms/DyeCalculator';
 import { DyeCocktailInput } from '../organisms/DyeCocktailInput';
 import { supabase } from '../../lib/supabase';
 import { useRole } from '../../contexts/RoleContext';
+import { getTodayBounds } from '../../lib/dateUtils';
 
 export const MasterView = () => {
     const { currentUser } = useRole();
     const [currentAppointment, setCurrentAppointment] = useState(null);
+    const [todayEarnings, setTodayEarnings] = useState(0);
+    const [materialCost, setMaterialCost] = useState(0);
     const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
-        const fetchTodayAppointment = async () => {
+        const fetchTodayData = async () => {
             if (!currentUser?.dikidi_master_id) {
                 setIsLoading(false);
                 return;
             }
 
             try {
-                // Determine today's start and end bounds in local time
-                const today = new Date();
-                const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate()).toISOString();
-                const endOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59, 999).toISOString();
+                // Use standardized timezone bounds for Asia/Tbilisi
+                const { startOfDay, endOfDay } = getTodayBounds();
 
                 // Fetch appointments for this master for today
                 const { data, error } = await supabase
@@ -38,20 +39,33 @@ export const MasterView = () => {
                 if (error) throw error;
 
                 if (data && data.length > 0) {
-                    // Find the nearest future or currently uncompleted appointment
+                    // Find the nearest future or currently active appointment
                     const now = new Date();
                     const activeAppointment = data.find(appt => {
                         const apptTime = new Date(appt.start_time);
-                        // Consider it active if it's in the future or within a reasonable past window (e.g., started but not finished)
-                        // For simplicity here, just taking the first one that hasn't officially 'ended' if we had end times, 
-                        // or just the first appointment chronologically if we assume they are processed sequentially.
-                        // Let's refine: find the first one whose start_time + duration (or just start_time) is closest to now.
-                        // If no duration, just pick the first one that is >= now, or the last one if all are in the past.
-                        return apptTime >= now || (apptTime < now && appt.status !== 'completed'); // simplified check
+                        return apptTime >= now || (apptTime < now && appt.status !== 'completed');
                     });
 
-                    // Fallback to the first appointment of the day if none match "active" perfectly
                     setCurrentAppointment(activeAppointment || data[0]);
+
+                    // Calculate total earnings for today (all paid appointments)
+                    const earnings = data
+                        .filter(a => a.status === 'paid')
+                        .reduce((sum, a) => sum + (a.service_price || 0), 0);
+                    setTodayEarnings(earnings);
+
+                    // Fetch real material cost from usage_logs for today
+                    const appointmentIds = data.map(a => a.id);
+                    const { data: usageLogs, error: usageError } = await supabase
+                        .from('usage_logs')
+                        .select('grams_used')
+                        .in('appointment_id', appointmentIds);
+
+                    if (!usageError && usageLogs) {
+                        // Assume standard cost per gram: 0.50 ₾/gram
+                        const totalCost = usageLogs.reduce((sum, log) => sum + (log.grams_used * 0.50), 0);
+                        setMaterialCost(totalCost);
+                    }
                 } else {
                     setCurrentAppointment(null);
                 }
@@ -62,7 +76,7 @@ export const MasterView = () => {
             }
         };
 
-        fetchTodayAppointment();
+        fetchTodayData();
     }, [currentUser?.dikidi_master_id]);
 
     const isColorService = (serviceName) => {
@@ -108,7 +122,7 @@ export const MasterView = () => {
                                 <div className="flex flex-col bg-black/20 px-3 py-1.5 rounded-lg border border-white/5">
                                     <span className="text-[10px] text-zinc-400 uppercase">Время</span>
                                     <span className="font-mono text-sm font-semibold text-zinc-100">
-                                        {new Date(currentAppointment.start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                        {new Date(currentAppointment.start_time).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Tbilisi' })}
                                     </span>
                                 </div>
                                 <div className="flex flex-col bg-black/20 px-3 py-1.5 rounded-lg border border-white/5 flex-1 line-clamp-2">
@@ -122,9 +136,9 @@ export const MasterView = () => {
                     </Card>
 
                     <LiveEarningsWidget
-                        currentEarnings={currentAppointment.price || 0} // Using actual price if available
-                        materialCost={0} // TODO: Calculate from usage_logs
-                        allowance={(currentAppointment.price || 0) * 0.1 || 25.00} // Mock logic
+                        currentEarnings={currentAppointment.service_price || 0}
+                        materialCost={materialCost}
+                        allowance={(currentAppointment.service_price || 0) * 0.1 || 25.00}
                     />
 
                     {/* Smart Logic Rendering */}

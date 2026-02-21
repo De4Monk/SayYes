@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 
 import { supabase } from '../../lib/supabase';
 import { useRole } from '../../contexts/RoleContext';
+import { getTodayBounds, getLastWeekSameDayBounds, getTodayDateHeader } from '../../lib/dateUtils';
 import { AppointmentListItem } from '../molecules/AppointmentListItem';
 import { InventoryWidget } from '../molecules/InventoryWidget';
 import { NavLink } from 'react-router-dom';
@@ -11,6 +12,7 @@ import { Card } from '../atoms/Card';
 export const SalonOperationsDashboard = () => {
     const [appointments, setAppointments] = useState([]);
     const [stats, setStats] = useState({ revenue: 0, count: 0 });
+    const [trend, setTrend] = useState(null); // null = loading, number = percentage
     const [loading, setLoading] = useState(true);
 
     const { currentRole, currentUser } = useRole();
@@ -24,35 +26,28 @@ export const SalonOperationsDashboard = () => {
     const fetchData = async () => {
         setLoading(true);
         try {
-            // Fix: Use local date string to avoid UTC conversion issues
-            // 'en-CA' format is YYYY-MM-DD which matches ISO date part
-            const todayStr = new Date().toLocaleDateString('en-CA');
-            console.log("Fetching appointments for local date:", todayStr);
+            // Use standardized timezone helper for Asia/Tbilisi
+            const { startOfDay, endOfDay } = getTodayBounds();
 
-            // Get appointments for today
             // Get appointments for today
             let query = supabase
                 .from('appointments')
                 .select('*')
-                .gte('appointment_time', `${todayStr}T00:00:00`)
-                .lte('appointment_time', `${todayStr}T23:59:59`)
-                .order('appointment_time', { ascending: true });
+                .gte('start_time', startOfDay)
+                .lte('start_time', endOfDay)
+                .order('start_time', { ascending: true });
 
-            // RBAC Filter: 
+            // RBAC Filter:
             // - Owner/Admin: See ALL appointments (no filter)
             // - Master/Barber: See ONLY their own appointments (filter by dikidi_master_id)
             if (currentRole === 'master' || currentRole === 'barber') {
                 if (currentUser && currentUser.dikidi_master_id) {
-                    // console.log("Applying Master Filter:", currentUser.dikidi_master_id);
                     query = query.eq('master_id', currentUser.dikidi_master_id);
                 } else {
-                    console.warn("Role is master but no dikidi_master_id found in profile. Showing empty or all?");
-                    // Ideally show nothing if ID is missing to be safe, but for now we let it fall through or we could force a filter that returns nothing
-                    // query = query.eq('master_id', '000000'); // Force empty
+                    // Security: No dikidi_master_id means we can't identify the master.
+                    // Force empty result to prevent data leakage.
+                    query = query.eq('master_id', '__NONE__');
                 }
-            } else if (currentRole === 'owner' || currentRole === 'admin') {
-                // No filter needed, they see everything
-                // console.log("Owner/Admin Access - Showing All Records");
             }
 
             const { data, error } = await query;
@@ -69,6 +64,9 @@ export const SalonOperationsDashboard = () => {
 
             setStats({ revenue, count: appts.length });
 
+            // Calculate revenue trend vs same weekday last week
+            await fetchRevenueTrend(revenue);
+
         } catch (err) {
             console.error("Error fetching dashboard data:", err);
         } finally {
@@ -76,13 +74,56 @@ export const SalonOperationsDashboard = () => {
         }
     };
 
+    const fetchRevenueTrend = async (todayRevenue) => {
+        try {
+            const { startOfDay, endOfDay } = getLastWeekSameDayBounds();
+
+            let query = supabase
+                .from('appointments')
+                .select('service_price')
+                .gte('start_time', startOfDay)
+                .lte('start_time', endOfDay)
+                .eq('status', 'paid');
+
+            // Apply same RBAC filter for trend comparison
+            if (currentRole === 'master' || currentRole === 'barber') {
+                if (currentUser?.dikidi_master_id) {
+                    query = query.eq('master_id', currentUser.dikidi_master_id);
+                } else {
+                    query = query.eq('master_id', '__NONE__');
+                }
+            }
+
+            const { data, error } = await query;
+            if (error) throw error;
+
+            const lastWeekRevenue = (data || []).reduce((sum, a) => sum + (a.service_price || 0), 0);
+
+            if (lastWeekRevenue > 0) {
+                const pct = ((todayRevenue - lastWeekRevenue) / lastWeekRevenue) * 100;
+                setTrend(Math.round(pct));
+            } else if (todayRevenue > 0) {
+                setTrend(100); // All new revenue vs zero last week
+            } else {
+                setTrend(0);
+            }
+        } catch (err) {
+            console.error("Error fetching revenue trend:", err);
+            setTrend(null);
+        }
+    };
+
+    // Format trend display
+    const trendText = trend !== null ? `${trend >= 0 ? '+' : ''}${trend}%` : '--%';
+    const trendIcon = trend !== null && trend >= 0 ? 'trending_up' : 'trending_down';
+
     return (
         <>
             {/* Header Section */}
             <header className="sticky top-0 z-20 bg-background-light/95 dark:bg-background-dark/95 backdrop-blur-sm px-4 pt-4 pb-2 border-b border-slate-200 dark:border-slate-800">
                 <div className="flex items-center justify-between mb-4">
                     <div>
-                        <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">{new Date().toLocaleDateString('ru-RU', { weekday: 'long', month: 'short', day: 'numeric' })}</p>
+                        <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">{getTodayDateHeader()}</p>
                         <h1 className="text-xl font-bold text-slate-900 dark:text-white mt-0.5">
                             {(currentRole === 'owner' || currentRole === 'admin')
                                 ? 'SayYes Salon'
@@ -113,14 +154,14 @@ export const SalonOperationsDashboard = () => {
                             <span className="material-symbols-outlined text-primary-100">payments</span>
                         </div>
                         <div className="flex items-baseline gap-2 mt-2">
-                            <h2 className="text-4xl font-bold tracking-tight">${stats.revenue.toFixed(2)}</h2>
+                            <h2 className="text-4xl font-bold tracking-tight">{stats.revenue.toFixed(0)} ₾</h2>
                         </div>
                         <div className="flex items-center gap-1.5 mt-3">
-                            <div className="flex items-center justify-center bg-white/20 rounded-full px-2 py-0.5 text-xs font-semibold backdrop-blur-sm">
-                                <span className="material-symbols-outlined text-[14px] mr-0.5">trending_up</span>
-                                --%
+                            <div className={`flex items-center justify-center rounded-full px-2 py-0.5 text-xs font-semibold backdrop-blur-sm ${trend !== null && trend >= 0 ? 'bg-white/20' : 'bg-red-500/30'}`}>
+                                <span className="material-symbols-outlined text-[14px] mr-0.5">{trendIcon}</span>
+                                {trendText}
                             </div>
-                            <span className="text-primary-100 text-xs">к прошлому вторнику</span>
+                            <span className="text-primary-100 text-xs">к прошлой неделе</span>
                         </div>
                     </div>
                 </div>
@@ -166,7 +207,7 @@ export const SalonOperationsDashboard = () => {
                             return (
                                 <NavLink to="/schedule" key={app.id} className="block">
                                     <AppointmentListItem
-                                        time={app.appointment_time}
+                                        time={app.start_time}
                                         clientName={app.client_name}
                                         serviceName={app.service_name}
                                         status={app.status}
