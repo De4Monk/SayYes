@@ -203,34 +203,83 @@ async function processTask(task, integrations) {
 }
 
 async function sendTelegramMessage(task, botToken) {
-    const { data: client, error } = await supabase
+    // 1. Достаем TG ID клиента и проверяем Opt-out
+    const { data: client, error: clientErr } = await supabase
         .from('clients')
-        .select('telegram_id, is_subscribed_tg')
+        .select('telegram_id, is_subscribed_tg, name')
         .eq('id', task.client_id)
         .single();
+    if (clientErr || !client?.telegram_id || !client.is_subscribed_tg) {
+        throw new Error('Client unsubscribed or missing TG ID');
+    }
+    // 2. Получаем шаблон из БД
+    const { data: template } = await supabase
+        .from('notification_templates')
+        .select('message_text')
+        .eq('type', task.template_type)
+        .single();
+    if (!template) throw new Error(`Template not found for type: ${task.template_type}`);
+    let messageText = template.message_text;
+    // 3. Парсинг переменных
+    messageText = messageText.replace(/{{client_name}}/g, client.name || 'Гость');
+    messageText = messageText.replace(/{{salon_name}}/g, 'SayYes');
+    if (task.appointment_id) {
+        const { data: appt } = await supabase
+            .from('appointments')
+            .select('*')
+            .eq('id', task.appointment_id)
+            .single();
+        if (appt) {
+            let masterName = 'вашего мастера';
+            if (appt.master_id) {
+                const { data: master } = await supabase.from('profiles').select('full_name').eq('dikidi_master_id', appt.master_id).single();
+                if (master?.full_name) masterName = master.full_name;
+            }
 
-    if (error) throw new Error(`Client fetch error: ${error.message}`);
-    if (!client?.telegram_id || !client.is_subscribed_tg) throw new Error('Client unsubscribed or missing TG ID');
-
-    const replyMarkup = task.template_type === 'reminder_24h'
-        ? {
+            // Форматируем время в часовой пояс Тбилиси (или нужный локальный)
+            const timeStr = new Date(appt.start_time).toLocaleTimeString('ru-RU', { timeZone: 'Asia/Tbilisi', hour: '2-digit', minute: '2-digit' });
+            messageText = messageText
+                .replace(/{{time}}/g, timeStr)
+                .replace(/{{service}}/g, appt.service_name || 'услугу')
+                .replace(/{{master_name}}/g, masterName);
+        }
+    }
+    // 4. Формируем клавиатуру (Кнопки)
+    let replyMarkup = undefined;
+    if (task.template_type === 'reminder_24h') {
+        replyMarkup = {
             inline_keyboard: [
                 [{ text: "✅ Подтвердить визит", callback_data: `confirm_${task.appointment_id}` }],
-                [{ text: "❌ Отменить / Перенести", callback_data: `cancel_${task.appointment_id}` }]
+                [{ text: "❌ Отменить запись", url: "https://t.me/evgenii_sayyes" }] // Пока кидаем на админа для ручной отмены
             ]
-        }
-        : undefined;
-
+        };
+    } else if (task.template_type === 'feedback_request') {
+        replyMarkup = {
+            inline_keyboard: [[
+                { text: "1 ⭐️", callback_data: `nps_1_${task.appointment_id}` },
+                { text: "2 ⭐️", callback_data: `nps_2_${task.appointment_id}` },
+                { text: "3 ⭐️", callback_data: `nps_3_${task.appointment_id}` },
+                { text: "4 ⭐️", callback_data: `nps_4_${task.appointment_id}` },
+                { text: "5 ⭐️", callback_data: `nps_5_${task.appointment_id}` }
+            ]]
+        };
+    } else if (task.template_type === 'lost_client') {
+        replyMarkup = {
+            inline_keyboard: [
+                [{ text: "📅 Записаться онлайн", url: "https://dikidi.net/ru" }]
+            ]
+        };
+    }
+    // 5. Отправка в Telegram
     const response = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
             chat_id: client.telegram_id,
-            text: task.payload?.text || "Уведомление от салона SayYes",
+            text: messageText,
             reply_markup: replyMarkup
         })
     });
-
     if (!response.ok) throw new Error(`TG API Error: ${response.statusText}`);
     return true;
 }
@@ -275,10 +324,106 @@ app.post('/webhook/telegram', async (req, res) => {
             } catch (err) {
                 console.error("Ошибка при отправке приветствия:", err);
             }
+        } else {
+            // Это обычный текст (не команда). Проверяем, не жалоба ли это?
+            try {
+                // Ищем клиента по Telegram ID
+                const { data: client } = await supabase
+                    .from('clients')
+                    .select('id')
+                    .eq('telegram_id', chatId)
+                    .single();
+
+                if (client) {
+                    // Ищем недавний негативный отзыв этого клиента (за последние 24 часа), у которого еще нет комментария
+                    const { data: recentReview } = await supabase
+                        .from('reviews')
+                        .select('id')
+                        .eq('client_id', client.id)
+                        .lt('score', 5)
+                        .is('comment', null)
+                        .gte('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
+                        .order('created_at', { ascending: false })
+                        .limit(1)
+                        .single();
+
+                    if (recentReview) {
+                        // Обновляем отзыв, добавляя текст жалобы
+                        await supabase
+                            .from('reviews')
+                            .update({ comment: text })
+                            .eq('id', recentReview.id);
+
+                        // Подтверждаем получение клиенту
+                        await fetch(`https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/sendMessage`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                chat_id: chatId,
+                                text: "Спасибо. Ваше сообщение передано руководителю салона. Мы скоро с вами свяжемся для решения ситуации."
+                            })
+                        });
+                    }
+                }
+            } catch (err) {
+                console.error("Ошибка при обработке текстовой жалобы:", err);
+            }
         }
     }
 
-    // 2. Обработка нажатий на inline-кнопки (наше подтверждение визитов)
+    // 2. Обработка получения контакта (Склейка профилей)
+    if (body.message && body.message.contact) {
+        const chatId = body.message.chat.id;
+        const contact = body.message.contact;
+
+        // Защита: убеждаемся, что контакт принадлежит тому, кто его отправил
+        if (contact.user_id !== chatId) {
+            return res.status(200).send('OK');
+        }
+
+        // Нормализуем телефон: только цифры, начинаем с +
+        let phoneStr = contact.phone_number.replace(/\D/g, '');
+        if (!phoneStr.startsWith('+')) {
+            phoneStr = '+' + phoneStr;
+        }
+
+        try {
+            // Вызываем нашу SQL-функцию склейки профилей
+            const { data: targetId, error: mergeError } = await supabase
+                .rpc('merge_client_profiles', {
+                    p_telegram_id: chatId,
+                    p_phone: phoneStr
+                });
+
+            if (mergeError) throw mergeError;
+
+            console.log(`[MERGE] Успешно склеен профиль. Текущий ID: ${targetId}`);
+
+            // Отправляем подтверждение клиенту
+            await fetch(`https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/sendMessage`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    chat_id: chatId,
+                    text: "✅ Отлично! Ваш номер подтвержден, история визитов и бонусы синхронизированы.\nПожалуйста, вернитесь в приложение и обновите страницу."
+                })
+            });
+
+        } catch (err) {
+            console.error("[MERGE] Ошибка при склейке контактов:", err);
+
+            await fetch(`https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/sendMessage`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    chat_id: chatId,
+                    text: "⚠️ Произошла ошибка при синхронизации профиля. Пожалуйста, обратитесь к администратору."
+                })
+            });
+        }
+    }
+
+    // 3. Обработка нажатий на inline-кнопки (наше подтверждение визитов)
     if (body.callback_query) {
         const callbackQuery = body.callback_query;
         const data = callbackQuery.data;
@@ -321,6 +466,92 @@ app.post('/webhook/telegram', async (req, res) => {
                 }
             } catch (err) {
                 console.error("Ошибка обработки вебхука подтверждения:", err);
+            }
+        }
+
+        // Обработка NPS-оценок (Запрос отзыва)
+        if (data.startsWith('nps_')) {
+            // Формат: nps_SCORE_appointmentId
+            const parts = data.split('_');
+            const score = parseInt(parts[1]);
+            const appointmentId = parts[2];
+
+            try {
+                // 1. Получаем данные о визите для привязки отзыва
+                const { data: appt } = await supabase
+                    .from('appointments')
+                    .select('tenant_id, client_id')
+                    .eq('id', appointmentId)
+                    .single();
+
+                if (appt) {
+                    // 2. Сохраняем оценку в таблицу reviews
+                    const { error: reviewError } = await supabase
+                        .from('reviews')
+                        .insert({
+                            appointment_id: appointmentId,
+                            tenant_id: appt.tenant_id,
+                            client_id: appt.client_id,
+                            score: score
+                        });
+
+                    if (reviewError) {
+                        console.error("[NPS] Ошибка записи отзыва в БД:", reviewError);
+                    } else {
+                        console.log(`[NPS] Отзыв сохранен. Визит: ${appointmentId}, Оценка: ${score}`);
+                    }
+                }
+
+                let replyText = "";
+                let replyMarkup = undefined;
+
+                if (score === 5) {
+                    replyText = "Спасибо за высокую оценку! ❤️\nПомогите нам стать лучше — оставьте отзыв на удобной площадке:";
+
+                    // Достаем настройки ссылок салона
+                    const { data: settings } = await supabase
+                        .from('salon_settings')
+                        .select('review_links')
+                        .eq('owner_profile_id', (await supabase.from('profiles').select('id').eq('tenant_id', appt.tenant_id).eq('role', 'owner').single()).data?.id)
+                        .single();
+
+                    const buttons = [];
+
+                    if (settings && settings.review_links) {
+                        const links = settings.review_links;
+                        for (const key in links) {
+                            if (links[key].enabled && links[key].url) {
+                                buttons.push([{ text: links[key].label, url: links[key].url }]);
+                            }
+                        }
+                    }
+
+                    // Если владелец ничего не настроил, даем фолбэк-кнопку
+                    if (buttons.length === 0) {
+                        replyText = "Спасибо за высокую оценку! ❤️ Мы очень ценим ваше доверие.";
+                        replyMarkup = undefined;
+                    } else {
+                        replyMarkup = { inline_keyboard: buttons };
+                    }
+                } else {
+                    replyText = "Спасибо за честность. Нам очень жаль, что визит не был идеальным.\nПожалуйста, напишите ответным сообщением, что пошло не так — это сообщение прочитает лично руководитель салона.";
+                    // Здесь в будущем можно сделать запись оценки в базу данных
+                }
+
+                // Обновляем сообщение, убирая звездочки, чтобы не кликали дважды
+                await fetch(`https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/editMessageText`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        chat_id: chatId,
+                        message_id: messageId,
+                        text: replyText,
+                        reply_markup: replyMarkup
+                    })
+                });
+
+            } catch (err) {
+                console.error("Ошибка обработки NPS:", err);
             }
         }
     }

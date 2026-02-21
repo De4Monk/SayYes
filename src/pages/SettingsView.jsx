@@ -3,6 +3,7 @@ import { Heading, Text } from '../components/atoms/Typography';
 import { NotificationQueueWidget } from '../components/organisms/NotificationQueueWidget';
 import { NotificationTemplatesWidget } from '../components/organisms/NotificationTemplatesWidget';
 import { AdminPermissionsWidget } from '../components/organisms/AdminPermissionsWidget';
+import { ReviewLinksWidget } from '../components/organisms/ReviewLinksWidget';
 import { useRole } from '../contexts/RoleContext';
 
 export const SettingsView = () => {
@@ -19,6 +20,7 @@ export const SettingsView = () => {
 
             {currentRole === 'owner' && <AdminPermissionsWidget />}
             {(currentRole === 'owner' || currentRole === 'admin') && <NotificationTemplatesWidget />}
+            {currentRole === 'owner' && <ReviewLinksWidget />}
             <NotificationQueueWidget />
         </div>
     );

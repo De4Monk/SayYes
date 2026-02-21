@@ -3,6 +3,7 @@ import { Heading, Text } from '../atoms/Typography';
 import { BarPOSGrid } from '../organisms/BarPOSGrid';
 import { VerificationQueue } from '../organisms/VerificationQueue';
 import { InventoryTable } from '../organisms/InventoryTable';
+import { IncidentsWidget } from '../organisms/IncidentsWidget';
 
 export const AdminView = () => {
     return (
@@ -11,6 +12,8 @@ export const AdminView = () => {
                 <Heading level={1}>Admin Operations</Heading>
                 <Text>Manage floor operations and approvals</Text>
             </div>
+
+            <IncidentsWidget />
 
             <VerificationQueue />
 
