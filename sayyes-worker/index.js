@@ -87,6 +87,7 @@ app.post('/auth/telegram', async (req, res) => {
                 tenantId = client.tenant_id;
                 profile = client; // Возвращаем профиль клиента
             } else {
+                console.log(`[AUTH] User not found in profiles/clients. Starting auto-registration for telegram_id: ${user.id}`);
                 // АВТО-РЕГИСТРАЦИЯ: Если юзер зашел впервые, создаем профиль клиента
                 const { data: newClient, error: insertError } = await supabase
                     .from('clients')
@@ -99,10 +100,11 @@ app.post('/auth/telegram', async (req, res) => {
                     .single();
 
                 if (insertError) {
-                    console.error('Auto-registration error:', insertError);
+                    console.error('[AUTH] Auto-registration error:', insertError);
                     return res.status(500).json({ error: 'Failed to create new user' });
                 }
 
+                console.log(`[AUTH] Auto-registration successful for new client ID: ${newClient.id}`);
                 authRole = 'client';
                 authSub = newClient.id;
                 tenantId = null;
@@ -253,16 +255,20 @@ app.post('/webhook/telegram', async (req, res) => {
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         chat_id: chatId,
-                        text: "Добро пожаловать в SayYes! 💅\n\nЧтобы синхронизировать вашу историю визитов и бонусы, пожалуйста, поделитесь своим номером телефона, нажав кнопку ниже 👇",
+                        text: "Добро пожаловать в SayYes! 🖤\n\nЭтот бот — ваш личный ассистент.\nЗдесь вы можете:\n☕️ Заказать напитки к визиту\n🎁 Копить бонусы и скидки\n📅 Управлять своими записями\n\nОткройте личный кабинет, чтобы увидеть свои визиты:",
                         reply_markup: {
-                            keyboard: [
+                            inline_keyboard: [
                                 [{
-                                    text: "📱 Поделиться контактом",
-                                    request_contact: true
+                                    text: "📱 Личный кабинет",
+                                    web_app: {
+                                        url: "https://sayyes-1028200460308.europe-west1.run.app"
+                                    }
+                                }],
+                                [{
+                                    text: "📅 Записаться онлайн",
+                                    url: "https://dikidi.net/ru" // Заглушка, Владелец потом вставит свою ссылку
                                 }]
-                            ],
-                            resize_keyboard: true,
-                            one_time_keyboard: true
+                            ]
                         }
                     })
                 });
@@ -272,143 +278,121 @@ app.post('/webhook/telegram', async (req, res) => {
         }
     }
 
-    // 2. Обработка получения контакта (регистрация/связывание)
-    if (body.message && body.message.contact) {
-        const chatId = body.message.chat.id;
-        const contact = body.message.contact;
-
-        // Ensure the sharing user is the sender (security)
-        if (contact.user_id !== chatId) {
-            return res.status(200).send('OK'); // Ignore forwarded contacts
-        }
-
-        // Форматируем телефон: оставляем только цифры, добавляем +
-        let phoneStr = contact.phone_number.replace(/\D/g, '');
-        if (!phoneStr.startsWith('+')) {
-            phoneStr = '+' + phoneStr;
-        }
-
-        try {
-            // Ищем клиента по телефону в нашей БД (Парсер Dikidi должен сохранять в таком же формате)
-            const { data: existingClient, error: searchError } = await supabase
-                .from('clients')
-                .select('*')
-                .eq('phone', phoneStr)
                 .single();
 
-            if (existingClient) {
-                // Если клиент есть, связываем его Telegram ID
-                await supabase
-                    .from('clients')
-                    .update({
-                        telegram_id: chatId,
-                        is_subscribed_tg: true
-                    })
-                    .eq('id', existingClient.id);
-            } else {
-                // Если клиента нет, создаем нового
-                // Получаем первый попавшийся tenant_id или используем default, если система multi-tenant
-                // В данном случае берем первый попавшийся профиль организации для привязки
-                const { data: tenantProfile } = await supabase
-                    .from('profiles')
-                    .select('tenant_id')
-                    .not('tenant_id', 'is', null)
-                    .limit(1)
-                    .single();
+    if (existingClient) {
+        // Если клиент есть, связываем его Telegram ID
+        await supabase
+            .from('clients')
+            .update({
+                telegram_id: chatId,
+                is_subscribed_tg: true
+            })
+            .eq('id', existingClient.id);
+    } else {
+        // Если клиента нет, создаем нового
+        // Получаем первый попавшийся tenant_id или используем default, если система multi-tenant
+        // В данном случае берем первый попавшийся профиль организации для привязки
+        const { data: tenantProfile } = await supabase
+            .from('profiles')
+            .select('tenant_id')
+            .not('tenant_id', 'is', null)
+            .limit(1)
+            .single();
 
-                await supabase
-                    .from('clients')
-                    .insert({
-                        name: contact.first_name + (contact.last_name ? ' ' + contact.last_name : ''),
-                        phone: phoneStr,
-                        telegram_id: chatId,
-                        is_subscribed_tg: true,
-                        tenant_id: tenantProfile ? tenantProfile.tenant_id : null // Нужно продумать логику tenant_id для новых клиентов
-                    });
-            }
-
-            // Отправляем сообщение об успехе и кнопку открытия Mini App
-            await fetch(`https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/sendMessage`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    chat_id: chatId,
-                    text: "✅ Отлично! Ваш профиль синхронизирован.\n\nТеперь вы можете открыть личный кабинет 👇",
-                    reply_markup: {
-                        remove_keyboard: true, // Убираем обычную клавиатуру
-                        inline_keyboard: [
-                            [{
-                                text: "📱 Открыть приложение",
-                                web_app: {
-                                    url: "https://sayyes-1028200460308.europe-west1.run.app"
-                                }
-                            }]
-                        ]
-                    }
-                })
+        await supabase
+            .from('clients')
+            .insert({
+                name: contact.first_name + (contact.last_name ? ' ' + contact.last_name : ''),
+                phone: phoneStr,
+                telegram_id: chatId,
+                is_subscribed_tg: true,
+                tenant_id: tenantProfile ? tenantProfile.tenant_id : null // Нужно продумать логику tenant_id для новых клиентов
             });
-
-        } catch (err) {
-            console.error("Ошибка при обработке контакта:", err);
-            await fetch(`https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/sendMessage`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    chat_id: chatId,
-                    text: "Произошла ошибка при синхронизации. Попробуйте позже."
-                })
-            });
-        }
     }
 
-    // 2. Обработка нажатий на inline-кнопки (наше подтверждение визитов)
-    if (body.callback_query) {
-        const callbackQuery = body.callback_query;
-        const data = callbackQuery.data;
-        const chatId = callbackQuery.message.chat.id;
-        const messageId = callbackQuery.message.message_id;
+    // Отправляем сообщение об успехе и кнопку открытия Mini App
+    await fetch(`https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/sendMessage`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            chat_id: chatId,
+            text: "✅ Отлично! Ваш профиль синхронизирован.\n\nТеперь вы можете открыть личный кабинет 👇",
+            reply_markup: {
+                remove_keyboard: true, // Убираем обычную клавиатуру
+                inline_keyboard: [
+                    [{
+                        text: "📱 Открыть приложение",
+                        web_app: {
+                            url: "https://sayyes-1028200460308.europe-west1.run.app"
+                        }
+                    }]
+                ]
+            }
+        })
+    });
 
-        if (data.startsWith('confirm_')) {
-            const appointmentId = data.replace('confirm_', '');
+} catch (err) {
+    console.error("Ошибка при обработке контакта:", err);
+    await fetch(`https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/sendMessage`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            chat_id: chatId,
+            text: "Произошла ошибка при синхронизации. Попробуйте позже."
+        })
+    });
+}
+    }
 
-            try {
-                const { data: appt } = await supabase
+// 2. Обработка нажатий на inline-кнопки (наше подтверждение визитов)
+if (body.callback_query) {
+    const callbackQuery = body.callback_query;
+    const data = callbackQuery.data;
+    const chatId = callbackQuery.message.chat.id;
+    const messageId = callbackQuery.message.message_id;
+
+    if (data.startsWith('confirm_')) {
+        const appointmentId = data.replace('confirm_', '');
+
+        try {
+            const { data: appt } = await supabase
+                .from('appointments')
+                .select('tenant_id')
+                .eq('id', appointmentId)
+                .single();
+
+            if (appt) {
+                await supabase
                     .from('appointments')
-                    .select('tenant_id')
-                    .eq('id', appointmentId)
+                    .update({ status: 'client_confirmed' })
+                    .eq('id', appointmentId);
+
+                const { data: integration } = await supabase
+                    .from('salon_integrations')
+                    .select('telegram_bot_token')
+                    .eq('tenant_id', appt.tenant_id)
                     .single();
 
-                if (appt) {
-                    await supabase
-                        .from('appointments')
-                        .update({ status: 'client_confirmed' })
-                        .eq('id', appointmentId);
-
-                    const { data: integration } = await supabase
-                        .from('salon_integrations')
-                        .select('telegram_bot_token')
-                        .eq('tenant_id', appt.tenant_id)
-                        .single();
-
-                    if (integration?.telegram_bot_token) {
-                        await fetch(`https://api.telegram.org/bot${integration.telegram_bot_token}/editMessageText`, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                                chat_id: chatId,
-                                message_id: messageId,
-                                text: "✅ Спасибо, ваш визит подтвержден! Ждем вас."
-                            })
-                        });
-                    }
+                if (integration?.telegram_bot_token) {
+                    await fetch(`https://api.telegram.org/bot${integration.telegram_bot_token}/editMessageText`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            chat_id: chatId,
+                            message_id: messageId,
+                            text: "✅ Спасибо, ваш визит подтвержден! Ждем вас."
+                        })
+                    });
                 }
-            } catch (err) {
-                console.error("Ошибка обработки вебхука подтверждения:", err);
             }
+        } catch (err) {
+            console.error("Ошибка обработки вебхука подтверждения:", err);
         }
     }
+}
 
-    res.status(200).send('OK');
+res.status(200).send('OK');
 });
 
 const port = process.env.PORT || 8080;
